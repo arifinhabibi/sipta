@@ -1,113 +1,587 @@
+/*
+ * SIPTA Design System — v2 Redesign
+ *
+ * Fintech / analytics-grade token layer.
+ * Preserves all existing utility class usage across ~80 legacy files by
+ * remapping Tailwind v4's built-in color scale to semantic CSS variables.
+ * Dark mode toggles the underlying variables — no per-component migration
+ * required for basic adaptation. See docs/frontend-redesign/design-system.md.
+ */
+
 @import "tailwindcss";
 @plugin './hero.ts';
-/* Note: You may need to change the path to fit your project structure */
+/* HeroUI theme source scan — required for utility generation. */
 @source '../../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}';
 @custom-variant dark (&:is(.dark *));
 @import "leaflet/dist/leaflet.css";
 @import "react-big-calendar/lib/css/react-big-calendar.css";
 
-/* Tambahkan di globals.css atau dengan tailwind config */
+/* ------------------------------------------------------------------ */
+/*  SEMANTIC TOKENS — light                                           */
+/* ------------------------------------------------------------------ */
+:root {
+  /* Canvas & surface layers */
+  --sipta-background:        #F7F7F5;   /* app canvas */
+  --sipta-surface:           #FFFFFF;   /* card / panel */
+  --sipta-surface-2:         #FAFAF9;   /* subtle section bg */
+  --sipta-surface-3:         #F1F1EF;   /* deeper subtle bg (hover row, code) */
+  --sipta-surface-elevated:  #FFFFFF;   /* modal / dropdown */
+
+  /* Foreground */
+  --sipta-foreground:        #0B0B0F;   /* primary text */
+  --sipta-foreground-strong: #000000;
+  --sipta-muted-fg:          #6B6A6B;   /* secondary text */
+  --sipta-muted-fg-soft:     #8E8D8E;   /* placeholder / help */
+
+  /* Borders & lines */
+  --sipta-border:            #E7E5E1;
+  --sipta-border-strong:     #D6D3CE;
+  --sipta-border-subtle:     #EFEDE9;
+
+  /* Brand — sophisticated indigo (fintech signature) */
+  --sipta-primary:           #4F46E5;
+  --sipta-primary-hover:     #4338CA;
+  --sipta-primary-strong:    #3730A3;
+  --sipta-primary-fg:        #FFFFFF;
+  --sipta-primary-subtle:    #EEF2FF;
+  --sipta-primary-subtle-2:  #E0E7FF;
+  --sipta-primary-tint:      #C7D2FE;
+
+  /* Semantic status */
+  --sipta-success:           #059669;
+  --sipta-success-fg:        #FFFFFF;
+  --sipta-success-subtle:    #ECFDF5;
+  --sipta-success-tint:      #A7F3D0;
+
+  --sipta-warning:           #B45309;
+  --sipta-warning-fg:        #FFFFFF;
+  --sipta-warning-subtle:    #FFFBEB;
+  --sipta-warning-tint:      #FDE68A;
+
+  --sipta-destructive:       #DC2626;
+  --sipta-destructive-fg:    #FFFFFF;
+  --sipta-destructive-subtle:#FEF2F2;
+  --sipta-destructive-tint:  #FECACA;
+
+  --sipta-info:              #0369A1;
+  --sipta-info-fg:            #FFFFFF;
+  --sipta-info-subtle:       #F0F9FF;
+  --sipta-info-tint:         #BAE6FD;
+
+  --sipta-accent:            #7C3AED;   /* secondary accent (violet) */
+  --sipta-accent-subtle:     #F5F3FF;
+
+  /* Ring / focus */
+  --sipta-ring:              rgba(79, 70, 229, 0.35);
+
+  /* Radius scale */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+
+  /* Shadow scale — layered, subtle */
+  --shadow-xs: 0 1px 0 rgba(15, 15, 20, 0.03);
+  --shadow-sm: 0 1px 2px rgba(15, 15, 20, 0.04), 0 1px 3px rgba(15, 15, 20, 0.04);
+  --shadow-md: 0 4px 10px -2px rgba(15, 15, 20, 0.06), 0 2px 4px rgba(15, 15, 20, 0.04);
+  --shadow-lg: 0 12px 28px -8px rgba(15, 15, 20, 0.10), 0 6px 12px -4px rgba(15, 15, 20, 0.06);
+  --shadow-xl: 0 24px 48px -16px rgba(15, 15, 20, 0.16), 0 12px 24px -8px rgba(15, 15, 20, 0.08);
+  --shadow-inset-hairline: inset 0 0 0 1px rgba(15, 15, 20, 0.04);
+
+  /* Motion */
+  --ease-out-soft: cubic-bezier(.22,.61,.36,1);
+  --ease-in-out-soft: cubic-bezier(.4,0,.2,1);
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --dur-slow: 260ms;
+
+  /* Fonts — wired by app/layout.tsx via next/font */
+  --font-display-family: var(--font-display, "Bricolage Grotesque"), var(--font-geist-sans, ui-sans-serif), system-ui, sans-serif;
+  --font-body-family:    var(--font-geist-sans, ui-sans-serif), "Inter", system-ui, sans-serif;
+  --font-mono-family:    var(--font-mono, "JetBrains Mono"), var(--font-geist-mono, ui-monospace), monospace;
+}
+
+/* ------------------------------------------------------------------ */
+/*  SEMANTIC TOKENS — dark                                            */
+/* ------------------------------------------------------------------ */
+.dark {
+  --sipta-background:        #0A0A0C;
+  --sipta-surface:           #131318;
+  --sipta-surface-2:         #17171D;
+  --sipta-surface-3:         #1E1E25;
+  --sipta-surface-elevated:  #1B1B22;
+
+  --sipta-foreground:        #F5F5F4;
+  --sipta-foreground-strong: #FFFFFF;
+  --sipta-muted-fg:          #A3A3A6;
+  --sipta-muted-fg-soft:     #7C7C82;
+
+  --sipta-border:            #26262D;
+  --sipta-border-strong:     #34343C;
+  --sipta-border-subtle:     #1E1E25;
+
+  --sipta-primary:           #8B87F5;   /* lifted for dark bg */
+  --sipta-primary-hover:     #A5A2F8;
+  --sipta-primary-strong:    #6C68E8;
+  --sipta-primary-fg:        #0A0A0C;
+  --sipta-primary-subtle:    #1A1A32;
+  --sipta-primary-subtle-2:  #22224A;
+  --sipta-primary-tint:      #383876;
+
+  --sipta-success:           #34D399;
+  --sipta-success-fg:        #0A0A0C;
+  --sipta-success-subtle:    #0E2A22;
+  --sipta-success-tint:      #1F5C48;
+
+  --sipta-warning:           #F59E0B;
+  --sipta-warning-fg:        #0A0A0C;
+  --sipta-warning-subtle:    #2B1F0A;
+  --sipta-warning-tint:      #6B4D14;
+
+  --sipta-destructive:       #F87171;
+  --sipta-destructive-fg:    #0A0A0C;
+  --sipta-destructive-subtle:#2A1416;
+  --sipta-destructive-tint:  #6E2429;
+
+  --sipta-info:              #38BDF8;
+  --sipta-info-fg:           #0A0A0C;
+  --sipta-info-subtle:       #0A2334;
+  --sipta-info-tint:         #205A80;
+
+  --sipta-accent:            #A78BFA;
+  --sipta-accent-subtle:     #201636;
+
+  --sipta-ring:              rgba(139, 135, 245, 0.45);
+
+  --shadow-xs: 0 1px 0 rgba(0, 0, 0, 0.25);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.30);
+  --shadow-md: 0 4px 10px -2px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.30);
+  --shadow-lg: 0 12px 28px -8px rgba(0, 0, 0, 0.55), 0 6px 12px -4px rgba(0, 0, 0, 0.35);
+  --shadow-xl: 0 24px 48px -16px rgba(0, 0, 0, 0.70), 0 12px 24px -8px rgba(0, 0, 0, 0.40);
+  --shadow-inset-hairline: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* ------------------------------------------------------------------ */
+/*  TAILWIND v4 THEME BLOCK                                            */
+/*  Remaps built-in color palette so existing utility classes across   */
+/*  the ~80 legacy files automatically inherit the new design language */
+/*  and switch on dark mode via CSS variables.                         */
+/* ------------------------------------------------------------------ */
+@theme inline {
+  /* Fonts */
+  --font-sans: var(--font-body-family);
+  --font-mono: var(--font-mono-family);
+  --font-display: var(--font-display-family);
+
+  /* Semantic colors — reachable via `bg-primary`, `text-foreground`, etc. */
+  --color-background:        var(--sipta-background);
+  --color-surface:           var(--sipta-surface);
+  --color-surface-2:         var(--sipta-surface-2);
+  --color-surface-3:         var(--sipta-surface-3);
+  --color-surface-elevated:  var(--sipta-surface-elevated);
+  --color-foreground:        var(--sipta-foreground);
+  --color-muted-foreground:  var(--sipta-muted-fg);
+  --color-primary:           var(--sipta-primary);
+  --color-primary-foreground:var(--sipta-primary-fg);
+  --color-primary-subtle:    var(--sipta-primary-subtle);
+  --color-secondary:         var(--sipta-accent);
+  --color-success:           var(--sipta-success);
+  --color-success-foreground:var(--sipta-success-fg);
+  --color-warning:           var(--sipta-warning);
+  --color-destructive:       var(--sipta-destructive);
+  --color-info:              var(--sipta-info);
+  --color-border:            var(--sipta-border);
+  --color-border-strong:     var(--sipta-border-strong);
+  --color-ring:              var(--sipta-ring);
+
+  /* --- LEGACY UTILITY REMAP ---
+     The codebase uses raw Tailwind palette (bg-blue-600, text-gray-500, etc.).
+     Overriding these here lets every existing usage inherit the redesign. */
+
+  /* Neutrals (stone-tinted, dark-mode aware) */
+  --color-gray-50:  var(--sipta-surface-2);
+  --color-gray-100: var(--sipta-surface-3);
+  --color-gray-200: var(--sipta-border);
+  --color-gray-300: var(--sipta-border-strong);
+  --color-gray-400: var(--sipta-muted-fg-soft);
+  --color-gray-500: var(--sipta-muted-fg);
+  --color-gray-600: color-mix(in oklch, var(--sipta-foreground) 72%, var(--sipta-muted-fg));
+  --color-gray-700: color-mix(in oklch, var(--sipta-foreground) 85%, transparent);
+  --color-gray-800: var(--sipta-foreground);
+  --color-gray-900: var(--sipta-foreground-strong);
+  --color-gray-950: var(--sipta-foreground-strong);
+
+  /* Slate — used sparingly, mirror stone-tinted neutrals */
+  --color-slate-50:  var(--sipta-surface-2);
+  --color-slate-100: var(--sipta-surface-3);
+  --color-slate-200: var(--sipta-border);
+  --color-slate-300: var(--sipta-border-strong);
+  --color-slate-400: var(--sipta-muted-fg-soft);
+  --color-slate-500: var(--sipta-muted-fg);
+  --color-slate-600: color-mix(in oklch, var(--sipta-foreground) 72%, var(--sipta-muted-fg));
+  --color-slate-700: color-mix(in oklch, var(--sipta-foreground) 85%, transparent);
+  --color-slate-800: var(--sipta-foreground);
+  --color-slate-900: var(--sipta-foreground-strong);
+
+  /* Blues & indigos → primary indigo scale */
+  --color-blue-50:  var(--sipta-primary-subtle);
+  --color-blue-100: var(--sipta-primary-subtle-2);
+  --color-blue-200: var(--sipta-primary-tint);
+  --color-blue-300: color-mix(in oklch, var(--sipta-primary) 40%, var(--sipta-surface));
+  --color-blue-400: color-mix(in oklch, var(--sipta-primary) 65%, var(--sipta-surface));
+  --color-blue-500: color-mix(in oklch, var(--sipta-primary) 85%, black 5%);
+  --color-blue-600: var(--sipta-primary);
+  --color-blue-700: var(--sipta-primary-hover);
+  --color-blue-800: var(--sipta-primary-strong);
+  --color-blue-900: color-mix(in oklch, var(--sipta-primary-strong) 90%, black 15%);
+
+  --color-indigo-50:  var(--sipta-primary-subtle);
+  --color-indigo-100: var(--sipta-primary-subtle-2);
+  --color-indigo-200: var(--sipta-primary-tint);
+  --color-indigo-300: color-mix(in oklch, var(--sipta-primary) 45%, var(--sipta-surface));
+  --color-indigo-400: color-mix(in oklch, var(--sipta-primary) 65%, var(--sipta-surface));
+  --color-indigo-500: color-mix(in oklch, var(--sipta-primary) 85%, black 5%);
+  --color-indigo-600: var(--sipta-primary);
+  --color-indigo-700: var(--sipta-primary-hover);
+  --color-indigo-800: var(--sipta-primary-strong);
+  --color-indigo-900: color-mix(in oklch, var(--sipta-primary-strong) 90%, black 20%);
+
+  /* Emerald / green → success scale */
+  --color-emerald-50:  var(--sipta-success-subtle);
+  --color-emerald-100: color-mix(in oklch, var(--sipta-success-tint) 80%, var(--sipta-surface));
+  --color-emerald-200: var(--sipta-success-tint);
+  --color-emerald-300: color-mix(in oklch, var(--sipta-success) 55%, white 30%);
+  --color-emerald-400: color-mix(in oklch, var(--sipta-success) 75%, white 10%);
+  --color-emerald-500: color-mix(in oklch, var(--sipta-success) 90%, black 5%);
+  --color-emerald-600: var(--sipta-success);
+  --color-emerald-700: color-mix(in oklch, var(--sipta-success) 90%, black 10%);
+  --color-emerald-800: color-mix(in oklch, var(--sipta-success) 85%, black 20%);
+  --color-emerald-900: color-mix(in oklch, var(--sipta-success) 75%, black 30%);
+
+  --color-green-50:  var(--sipta-success-subtle);
+  --color-green-100: color-mix(in oklch, var(--sipta-success-tint) 80%, var(--sipta-surface));
+  --color-green-200: var(--sipta-success-tint);
+  --color-green-300: color-mix(in oklch, var(--sipta-success) 55%, white 30%);
+  --color-green-400: color-mix(in oklch, var(--sipta-success) 75%, white 10%);
+  --color-green-500: color-mix(in oklch, var(--sipta-success) 90%, black 5%);
+  --color-green-600: var(--sipta-success);
+  --color-green-700: color-mix(in oklch, var(--sipta-success) 90%, black 10%);
+  --color-green-800: color-mix(in oklch, var(--sipta-success) 85%, black 20%);
+
+  /* Reds & rose → destructive */
+  --color-red-50:  var(--sipta-destructive-subtle);
+  --color-red-100: color-mix(in oklch, var(--sipta-destructive-tint) 75%, var(--sipta-surface));
+  --color-red-200: var(--sipta-destructive-tint);
+  --color-red-300: color-mix(in oklch, var(--sipta-destructive) 55%, white 30%);
+  --color-red-400: color-mix(in oklch, var(--sipta-destructive) 75%, white 10%);
+  --color-red-500: color-mix(in oklch, var(--sipta-destructive) 90%, black 5%);
+  --color-red-600: var(--sipta-destructive);
+  --color-red-700: color-mix(in oklch, var(--sipta-destructive) 90%, black 10%);
+  --color-red-800: color-mix(in oklch, var(--sipta-destructive) 80%, black 20%);
+  --color-red-900: color-mix(in oklch, var(--sipta-destructive) 70%, black 30%);
+
+  --color-rose-50:  var(--sipta-destructive-subtle);
+  --color-rose-100: color-mix(in oklch, var(--sipta-destructive-tint) 75%, var(--sipta-surface));
+  --color-rose-200: var(--sipta-destructive-tint);
+  --color-rose-500: color-mix(in oklch, var(--sipta-destructive) 90%, black 5%);
+  --color-rose-600: var(--sipta-destructive);
+
+  /* Yellow & amber → warning */
+  --color-yellow-50:  var(--sipta-warning-subtle);
+  --color-yellow-100: color-mix(in oklch, var(--sipta-warning-tint) 80%, var(--sipta-surface));
+  --color-yellow-200: var(--sipta-warning-tint);
+  --color-yellow-300: color-mix(in oklch, var(--sipta-warning) 60%, white 25%);
+  --color-yellow-400: color-mix(in oklch, var(--sipta-warning) 80%, white 10%);
+  --color-yellow-500: color-mix(in oklch, var(--sipta-warning) 92%, black 3%);
+  --color-yellow-600: var(--sipta-warning);
+  --color-yellow-700: color-mix(in oklch, var(--sipta-warning) 90%, black 15%);
+  --color-yellow-800: color-mix(in oklch, var(--sipta-warning) 80%, black 25%);
+  --color-yellow-900: color-mix(in oklch, var(--sipta-warning) 70%, black 35%);
+
+  --color-amber-50:  var(--sipta-warning-subtle);
+  --color-amber-100: color-mix(in oklch, var(--sipta-warning-tint) 80%, var(--sipta-surface));
+  --color-amber-200: var(--sipta-warning-tint);
+  --color-amber-500: color-mix(in oklch, var(--sipta-warning) 92%, black 3%);
+  --color-amber-600: var(--sipta-warning);
+  --color-amber-700: color-mix(in oklch, var(--sipta-warning) 90%, black 15%);
+  --color-amber-800: color-mix(in oklch, var(--sipta-warning) 80%, black 25%);
+
+  /* Purple / violet — retained as secondary accent (fintech violet) */
+  --color-purple-50:  var(--sipta-accent-subtle);
+  --color-purple-100: color-mix(in oklch, var(--sipta-accent) 20%, var(--sipta-surface));
+  --color-purple-200: color-mix(in oklch, var(--sipta-accent) 35%, var(--sipta-surface));
+  --color-purple-500: color-mix(in oklch, var(--sipta-accent) 90%, black 5%);
+  --color-purple-600: var(--sipta-accent);
+  --color-purple-700: color-mix(in oklch, var(--sipta-accent) 92%, black 12%);
+  --color-purple-800: color-mix(in oklch, var(--sipta-accent) 82%, black 22%);
+  --color-purple-900: color-mix(in oklch, var(--sipta-accent) 70%, black 30%);
+
+  --color-violet-50:  var(--sipta-accent-subtle);
+  --color-violet-100: color-mix(in oklch, var(--sipta-accent) 20%, var(--sipta-surface));
+  --color-violet-500: color-mix(in oklch, var(--sipta-accent) 90%, black 5%);
+  --color-violet-600: var(--sipta-accent);
+  --color-violet-700: color-mix(in oklch, var(--sipta-accent) 92%, black 12%);
+
+  /* Cyan / teal / sky — infra info */
+  --color-cyan-50:  var(--sipta-info-subtle);
+  --color-cyan-100: color-mix(in oklch, var(--sipta-info-tint) 80%, var(--sipta-surface));
+  --color-cyan-500: color-mix(in oklch, var(--sipta-info) 90%, black 5%);
+  --color-cyan-600: var(--sipta-info);
+  --color-sky-50:   var(--sipta-info-subtle);
+  --color-sky-100:  color-mix(in oklch, var(--sipta-info-tint) 80%, var(--sipta-surface));
+  --color-sky-500:  color-mix(in oklch, var(--sipta-info) 90%, black 5%);
+  --color-sky-600:  var(--sipta-info);
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 28px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  GLOBAL RESETS & DEFAULTS                                          */
+/* ------------------------------------------------------------------ */
+* { border-color: var(--sipta-border); }
+
+html {
+  color-scheme: light;
+  background: var(--sipta-background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--sipta-background);
+  color: var(--sipta-foreground);
+  font-family: var(--font-body-family);
+  font-feature-settings: "cv11", "ss01", "ss03";
+  transition: background-color var(--dur) var(--ease-out-soft), color var(--dur) var(--ease-out-soft);
+}
+
+/* Display headings adopt the display font */
+h1, h2, h3 {
+  font-family: var(--font-display-family);
+  font-feature-settings: "ss01", "ss02";
+  letter-spacing: -0.015em;
+}
+
+/* Tabular numerals for data / stats */
+.font-mono, code, kbd, samp, pre,
+.tabular-nums, [data-tabular] {
+  font-family: var(--font-mono-family);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Selection */
+::selection {
+  background: color-mix(in oklch, var(--sipta-primary) 30%, transparent);
+  color: var(--sipta-foreground-strong);
+}
+
+/* Focus ring — sharper, accessible */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--sipta-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Custom scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sipta-border-strong) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--sipta-border-strong);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--sipta-muted-fg-soft);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+/* Motion */
 @keyframes float {
-  0%,
-  100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-5px);
-  }
+  0%, 100% { transform: translateY(0px); }
+  50%      { transform: translateY(-5px); }
 }
-
 @keyframes border-pulse {
-  0%,
-  100% {
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-  50% {
-    border-color: rgba(255, 255, 255, 0.5);
-  }
+  0%, 100% { border-color: rgba(255, 255, 255, 0.2); }
+  50%      { border-color: rgba(255, 255, 255, 0.5); }
 }
-
 @keyframes fade-in {
-  from {
-    opacity: 0;
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+.animate-float          { animation: float 3s ease-in-out infinite; }
+.animate-border-pulse   { animation: border-pulse 2s ease-in-out infinite; }
+.animate-fade-in        { animation: fade-in 0.32s var(--ease-out-soft) both; }
+.animate-pulse-soft     { animation: pulse-soft 1.6s ease-in-out infinite; }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
   }
-  to {
-    opacity: 1;
-  }
 }
 
-.animate-float {
-  animation: float 3s ease-in-out infinite;
+/* ------------------------------------------------------------------ */
+/*  APP SURFACE UTILITIES                                              */
+/*  Semantic classes new components can compose against.               */
+/* ------------------------------------------------------------------ */
+.sipta-surface {
+  background: var(--sipta-surface);
+  border: 1px solid var(--sipta-border);
+  border-radius: var(--radius-lg);
+}
+.sipta-surface-2 { background: var(--sipta-surface-2); }
+.sipta-elevated {
+  background: var(--sipta-surface-elevated);
+  border: 1px solid var(--sipta-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
 }
 
-.animate-border-pulse {
-  animation: border-pulse 2s ease-in-out infinite;
+/* Card interaction */
+.sipta-card-hover {
+  transition: transform var(--dur) var(--ease-out-soft),
+              box-shadow var(--dur) var(--ease-out-soft),
+              border-color var(--dur) var(--ease-out-soft);
+}
+.sipta-card-hover:hover {
+  border-color: var(--sipta-border-strong);
+  box-shadow: var(--shadow-md);
 }
 
-.animate-fade-in {
-  animation: fade-in 0.5s ease-in;
+/* Grid background (subtle canvas texture) */
+.sipta-grid-bg {
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, var(--sipta-border) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, var(--sipta-border) 55%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
+}
+.sipta-dots-bg {
+  background-image: radial-gradient(circle at 1px 1px,
+    color-mix(in oklch, var(--sipta-border-strong) 60%, transparent) 1px, transparent 0);
+  background-size: 22px 22px;
 }
 
-@theme {
-  --color-primary: #1e40af;
-  --color-secondary: #9333ea;
+/* Skeleton shimmer */
+.sipta-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--sipta-surface-3);
+  border-radius: var(--radius);
+}
+.sipta-skeleton::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--sipta-surface) 45%, transparent) 50%,
+    transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
 }
 
-/* styles/globals.css atau styles/calendar.css */
+/* Ambient glow behind hero elements */
+.sipta-ambient-glow::before {
+  content: "";
+  position: absolute; inset: -20% -10% auto -10%;
+  height: 60%;
+  background: radial-gradient(70% 60% at 50% 40%,
+    color-mix(in oklch, var(--sipta-primary) 30%, transparent),
+    transparent 70%);
+  filter: blur(48px);
+  pointer-events: none;
+  z-index: 0;
+}
 
-/* Mobile Responsive Calendar */
+/* ------------------------------------------------------------------ */
+/*  THIRD-PARTY OVERRIDES                                              */
+/* ------------------------------------------------------------------ */
+
+/* react-big-calendar — inherit tokens */
+.rbc-calendar { color: var(--sipta-foreground); font-family: var(--font-body-family); }
+.rbc-off-range-bg { background: var(--sipta-surface-2); }
+.rbc-today { background: var(--sipta-primary-subtle); }
+.rbc-header { color: var(--sipta-muted-fg); border-color: var(--sipta-border); }
+.rbc-event { background: var(--sipta-primary); border-radius: 6px; border: none; padding: 2px 4px; }
+.rbc-toolbar button {
+  background: var(--sipta-surface);
+  color: var(--sipta-foreground);
+  border: 1px solid var(--sipta-border);
+  border-radius: 8px;
+}
+.rbc-toolbar button:hover {
+  background: var(--sipta-surface-3);
+}
+.rbc-toolbar button.rbc-active {
+  background: var(--sipta-primary);
+  color: var(--sipta-primary-fg);
+  border-color: var(--sipta-primary);
+}
+.rbc-month-view, .rbc-time-view {
+  border-color: var(--sipta-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.rbc-day-bg + .rbc-day-bg,
+.rbc-month-row + .rbc-month-row,
+.rbc-time-content, .rbc-time-header-content { border-color: var(--sipta-border); }
+
+/* Leaflet — theme-aware attribution */
+.leaflet-container { background: var(--sipta-surface-3); border-radius: var(--radius-md); }
+.dark .leaflet-tile { filter: brightness(0.85) contrast(1.05); }
+
+/* Mobile calendar tweaks (retained) */
 @media (max-width: 768px) {
-  .rbc-calendar {
-    font-size: 8pt !important;
-  }
-
-  .rbc-month-view {
-    font-size: 8pt !important;
-  }
-
-  .rbc-date-cell {
-    font-size: 7pt !important;
-    padding: 1px 2px !important;
-  }
-
-  .rbc-event {
-    font-size: 6pt !important;
-    min-height: 14px !important;
-    padding: 0px 1px !important;
-    line-height: 1.1 !important;
-  }
-
-  .rbc-header {
-    font-size: 7pt !important;
-    padding: 4px 1px !important;
-  }
-
-  .rbc-toolbar {
-    font-size: 8pt !important;
-  }
-
-  .rbc-toolbar button {
-    font-size: 8pt !important;
-    padding: 4px 6px !important;
-  }
+  .rbc-calendar     { font-size: 8pt !important; }
+  .rbc-month-view   { font-size: 8pt !important; }
+  .rbc-date-cell    { font-size: 7pt !important; padding: 1px 2px !important; }
+  .rbc-event        { font-size: 6pt !important; min-height: 14px !important; padding: 0px 1px !important; line-height: 1.1 !important; }
+  .rbc-header       { font-size: 7pt !important; padding: 4px 1px !important; }
+  .rbc-toolbar      { font-size: 8pt !important; }
+  .rbc-toolbar button { font-size: 8pt !important; padding: 4px 6px !important; }
 }
-
-/* Tambahkan di file global.css atau style.css */
 @media (max-width: 640px) {
-  .month-navigation-compact {
-    padding: 0.5rem;
-  }
-  
-  .month-navigation-compact button {
-    min-width: 44px;
-    min-height: 44px;
-  }
-  
+  .month-navigation-compact         { padding: 0.5rem; }
+  .month-navigation-compact button  { min-width: 44px; min-height: 44px; }
   .month-name {
-    font-size: 0.875rem;
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-size: 0.875rem; max-width: 120px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
 }
+
+/* react-hot-toast — theme-aware toaster (react-hot-toast reads via CSS vars we set) */
+:root { --rht-bg: var(--sipta-surface-elevated); --rht-fg: var(--sipta-foreground); }
+
+/* Ensure images/logos on primary gradients keep contrast */
+.on-primary { color: var(--sipta-primary-fg); }

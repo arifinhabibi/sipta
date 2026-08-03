@@ -1,362 +1,569 @@
-import { useAuthStore } from '@/src/state/AuthStore'
+"use client";
+
 import {
   AcademicCapIcon,
-  ChevronDownIcon,
-  UserCircleIcon,
-  Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
-  ChartBarIcon,
+  Bars3Icon,
+  CalendarIcon,
+  ChevronDownIcon,
+  ClipboardDocumentListIcon,
   ExclamationTriangleIcon,
   HomeIcon,
+  UserCircleIcon,
   UserGroupIcon,
-  CalendarIcon,
-  ClipboardDocumentListIcon
-} from '@heroicons/react/24/outline'
-import Link from 'next/link'
-import { useRouter, usePathname } from 'next/navigation'
-import React, { useEffect, useState } from 'react'
-import toast from 'react-hot-toast'
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import type React from "react";
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
+import { useAuthStore } from "@/src/state/AuthStore";
+import ThemeToggle from "./ThemeToggle";
+
+/* ------------------------------------------------------------------ */
+/*  HeaderComponent — SIPTA v2 shell                                   */
+/*                                                                    */
+/*  Preserves 100% of behavior from v1:                                */
+/*   - navigation destinations, roles, active-route detection         */
+/*   - profile dropdown, logout confirmation, toast semantics         */
+/*   - localStorage `auth-storage` read for cached identity           */
+/*   - useAuthStore.logout side effects                               */
+/*                                                                    */
+/*  Visual redesign:                                                  */
+/*   - replaces loud blue/indigo gradient with a subtle top-bar shell */
+/*   - adds sticky border + hairline separator                        */
+/*   - adds theme toggle, mobile drawer, refined focus rings          */
+/*   - uses semantic CSS-var tokens (light + dark aware)              */
+/* ------------------------------------------------------------------ */
+
+interface NavItem {
+  href: string;
+  label: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  adminOnly?: boolean;
+  testId: string;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { href: "/", label: "Dashboard", Icon: HomeIcon, testId: "nav-dashboard" },
+  {
+    href: "/teachers",
+    label: "Guru",
+    Icon: UserGroupIcon,
+    adminOnly: true,
+    testId: "nav-teachers",
+  },
+  {
+    href: "/classroom",
+    label: "Kelas",
+    Icon: AcademicCapIcon,
+    testId: "nav-classroom",
+  },
+  {
+    href: "/schedules",
+    label: "Jadwal",
+    Icon: CalendarIcon,
+    testId: "nav-schedules",
+  },
+  {
+    href: "/reports",
+    label: "Laporan",
+    Icon: ClipboardDocumentListIcon,
+    testId: "nav-reports",
+  },
+];
 
 function HeaderComponent() {
-  const [isProfileOpen, setIsProfileOpen] = useState(false)
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
-  const [user, setUser] = useState({ fullname: '', degree: '', email: '', photo: '', role: '' })
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const [user, setUser] = useState({
+    fullname: "",
+    degree: "",
+    email: "",
+    photo: "",
+    role: "",
+  });
   const [instance, setInstance] = useState({
-    name: '',
-    description: '',
-    type_institutions: '',
-    logo: ''
-  })
-  const [academicYear, setAcademicYear] = useState({ name: '', periode: '' })
-  const { logout } = useAuthStore()
-  const router = useRouter()
-  const pathname = usePathname()
+    name: "",
+    description: "",
+    type_institutions: "",
+    logo: "",
+  });
+  const [academicYear, setAcademicYear] = useState({ name: "", periode: "" });
+  const { logout } = useAuthStore();
+  const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    const authData = localStorage.getItem('auth-storage')
+    const authData = localStorage.getItem("auth-storage");
     if (authData) {
       try {
-        const parsed = JSON.parse(authData)
-        setUser(parsed.state?.user || {})
-        setInstance(parsed.state?.instance || {})
-        setAcademicYear(parsed.state?.academic_year || {})
-      } catch (err) {
-        toast.error('Gagal membaca data login.')
+        const parsed = JSON.parse(authData);
+        setUser(parsed.state?.user || {});
+        setInstance(parsed.state?.instance || {});
+        setAcademicYear(parsed.state?.academic_year || {});
+      } catch (_err) {
+        toast.error("Gagal membaca data login.");
       }
     }
-  }, [])
+  }, []);
 
   const handleLogoutClick = () => {
-    setIsProfileOpen(false)
-    setShowLogoutConfirm(true)
-  }
+    setIsProfileOpen(false);
+    setShowLogoutConfirm(true);
+  };
 
   const handleConfirmLogout = () => {
-    setShowLogoutConfirm(false)
-    
+    setShowLogoutConfirm(false);
     try {
-      const resp: any = logout()
+      const resp: any = logout();
       if (resp?.success !== false) {
-        toast.success(resp?.message || 'Berhasil keluar dari akun.')
-        setTimeout(() => {
-          router.push('/auth/login')
-        }, 1200)
+        toast.success(resp?.message || "Berhasil keluar dari akun.");
+        setTimeout(() => router.push("/auth/login"), 1200);
       } else {
-        toast.error('Logout gagal. Coba lagi.')
+        toast.error("Logout gagal. Coba lagi.");
       }
-    } catch (err) {
-      toast.error('Terjadi kesalahan saat logout.')
+    } catch (_err) {
+      toast.error("Terjadi kesalahan saat logout.");
     }
-  }
+  };
 
-  const handleCancelLogout = () => {
-    setShowLogoutConfirm(false)
-  }
+  const handleCancelLogout = () => setShowLogoutConfirm(false);
+  const isActiveRoute = (route: string) => pathname === route;
+  const visibleNav = NAV_ITEMS.filter(
+    (n) => !n.adminOnly || user.role === "admin",
+  );
 
-  const isActiveRoute = (route: string) => {
-    return pathname === route
-  }
+  const roleLabel = (role: string) => {
+    const roles: Record<string, string> = {
+      admin: "Administrator",
+      teacher: "Guru",
+      superadmin: "Super Admin",
+    };
+    return roles[role] || "Pengguna";
+  };
 
-  const getRoleText = (role: string) => {
-    const roles = {
-      'admin': 'Administrator',
-      'teacher': 'Guru',
-      'superadmin': 'Super Admin'
-    }
-    return roles[role as keyof typeof roles] || 'Pengguna'
-  }
+  const initials =
+    (user.fullname || "?")
+      .split(" ")
+      .map((p) => p.charAt(0))
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "?";
 
   return (
     <>
-      <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            {/* Logo & Institution Info */}
-            <div className="flex items-center space-x-3">
-              <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
-                <div className="bg-white/20 p-2 rounded-xl backdrop-blur-sm">
-                  <AcademicCapIcon className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold">
-                    {instance.type_institutions?.toUpperCase()} {instance.name?.charAt(0).toUpperCase() + instance.name?.slice(1)}
-                  </h1>
-                  <p className="text-blue-100 text-xs hidden sm:block">
-                    {instance.description || 'Sistem Manajemen Pendidikan'}
-                  </p>
-                  {/* Tahun Ajaran */}
-                  {academicYear.name && (
-                    <div className="flex items-center space-x-1 mt-1">
-                      <span className="text-blue-100 text-xs bg-white/20 px-2 py-1 rounded-md">
-                        {academicYear.name} - {academicYear.periode}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </Link>
+      <header
+        className="sticky top-0 z-40 backdrop-blur-md"
+        style={{
+          background:
+            "color-mix(in oklch, var(--sipta-surface) 88%, transparent)",
+          borderBottom: "1px solid var(--sipta-border)",
+        }}
+        data-testid="app-header"
+      >
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
+          {/* Brand */}
+          <Link
+            href="/"
+            className="flex items-center gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sipta-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--sipta-surface)] rounded-lg"
+            data-testid="header-brand"
+          >
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-xl"
+              style={{
+                background:
+                  "linear-gradient(135deg, var(--sipta-primary), color-mix(in oklch, var(--sipta-accent) 55%, var(--sipta-primary)))",
+                boxShadow:
+                  "var(--shadow-sm), inset 0 0 0 1px rgba(255,255,255,0.12)",
+                color: "var(--sipta-primary-fg)",
+              }}
+              aria-hidden="true"
+            >
+              <AcademicCapIcon className="h-5 w-5" />
             </div>
-
-            {/* Navigation Menu - Desktop */}
-            <div className="hidden md:flex items-center space-x-1">
-
-              <Link
-                href="/"
-                className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-colors ${
-                  isActiveRoute('/') 
-                    ? 'bg-white/20 text-white' 
-                    : 'text-blue-100 hover:bg-white/10 hover:text-white'
-                }`}
+            <div className="min-w-0 leading-tight">
+              <div
+                className="truncate text-sm font-semibold tracking-tight sm:text-base"
+                style={{
+                  color: "var(--sipta-foreground)",
+                  fontFamily: "var(--font-display-family)",
+                }}
               >
-                <HomeIcon className="h-5 w-5" />
-                <span>Dashboard</span>
-              </Link>
+                {instance.type_institutions
+                  ? `${instance.type_institutions.toUpperCase()} `
+                  : "SIPTA "}
+                {instance.name
+                  ? instance.name.charAt(0).toUpperCase() +
+                    instance.name.slice(1)
+                  : "System"}
+              </div>
+              <div
+                className="hidden text-[11px] sm:block"
+                style={{ color: "var(--sipta-muted-fg)" }}
+              >
+                {academicYear.name
+                  ? `T.A. ${academicYear.name} · ${academicYear.periode || "—"}`
+                  : instance.description || "Sistem Manajemen Pendidikan"}
+              </div>
+            </div>
+          </Link>
 
-              {user.role === 'admin' && (
+          {/* Desktop nav */}
+          <nav
+            className="hidden items-center gap-1 md:flex"
+            aria-label="Navigasi utama"
+          >
+            {visibleNav.map(({ href, label, Icon, testId }) => {
+              const active = isActiveRoute(href);
+              return (
                 <Link
-                  href="/teachers"
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-colors ${
-                    isActiveRoute('/teachers') 
-                      ? 'bg-white/20 text-white' 
-                      : 'text-blue-100 hover:bg-white/10 hover:text-white'
-                  }`}
+                  key={href}
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className="group relative inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+                  style={{
+                    color: active
+                      ? "var(--sipta-foreground)"
+                      : "var(--sipta-muted-fg)",
+                    background: active
+                      ? "var(--sipta-surface-3)"
+                      : "transparent",
+                  }}
+                  data-testid={testId}
                 >
-                  <UserGroupIcon className="h-5 w-5" />
-                  <span>Data Guru</span>
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                  <span>{label}</span>
+                  {active && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-x-3 -bottom-[15px] h-0.5 rounded-full"
+                      style={{ background: "var(--sipta-primary)" }}
+                    />
+                  )}
                 </Link>
-              )}
+              );
+            })}
+          </nav>
 
-              <Link
-                href="/classroom"
-                className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-colors ${
-                  isActiveRoute('/classroom') 
-                    ? 'bg-white/20 text-white' 
-                    : 'text-blue-100 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <AcademicCapIcon className="h-5 w-5" />
-                <span>Kelas</span>
-              </Link>
+          {/* Right cluster */}
+          <div className="flex items-center gap-1.5">
+            <ThemeToggle />
 
-              <Link
-                href="/schedules"
-                className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-colors ${
-                  isActiveRoute('/schedules') 
-                    ? 'bg-white/20 text-white' 
-                    : 'text-blue-100 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <CalendarIcon className="h-5 w-5" />
-                <span>Jadwal</span>
-              </Link>
-
-              <Link
-                href="/reports"
-                className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-colors ${
-                  isActiveRoute('/reports') 
-                    ? 'bg-white/20 text-white' 
-                    : 'text-blue-100 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <ClipboardDocumentListIcon className="h-5 w-5" />
-                <span>Laporan</span>
-              </Link>
-            </div>
-
-            {/* Profile Dropdown */}
+            {/* Profile menu */}
             <div className="relative">
               <button
-                className="flex items-center space-x-2 px-3 py-2 rounded-xl bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-colors"
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                type="button"
+                className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sipta-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--sipta-surface)]"
+                style={{
+                  border: "1px solid var(--sipta-border)",
+                  background: "var(--sipta-surface)",
+                }}
+                onClick={() => setIsProfileOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={isProfileOpen}
+                data-testid="header-profile-button"
               >
-                <UserCircleIcon className="h-6 w-6 text-white" />
-                <div className="text-left hidden sm:block">
-                  <div className="font-semibold text-sm max-w-32 truncate">
-                    {user.fullname} {user.degree}
-                  </div>
-                  <div className="text-blue-100 text-xs">
-                    {getRoleText(user.role)}
-                  </div>
-                </div>
+                <span
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-[11px] font-semibold"
+                  style={{
+                    background: "var(--sipta-primary-subtle)",
+                    color: "var(--sipta-primary)",
+                  }}
+                  aria-hidden="true"
+                >
+                  {initials}
+                </span>
+                <span className="hidden text-left leading-tight sm:block">
+                  <span
+                    className="block max-w-[120px] truncate text-xs font-semibold"
+                    style={{ color: "var(--sipta-foreground)" }}
+                  >
+                    {user.fullname || "Guest"}
+                  </span>
+                  <span
+                    className="block text-[10px]"
+                    style={{ color: "var(--sipta-muted-fg)" }}
+                  >
+                    {roleLabel(user.role)}
+                  </span>
+                </span>
                 <ChevronDownIcon
-                  className={`h-4 w-4 text-white transition-transform ${
-                    isProfileOpen ? 'rotate-180' : ''
+                  className={`h-4 w-4 transition-transform ${
+                    isProfileOpen ? "rotate-180" : ""
                   }`}
+                  style={{ color: "var(--sipta-muted-fg)" }}
+                  aria-hidden="true"
                 />
               </button>
 
               {isProfileOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-200 py-2 z-50">
-                  {/* User Info */}
-                  <div className="px-4 py-3 border-b border-gray-100">
-                    <div className="font-semibold text-gray-900 truncate">
-                      {user.fullname} {user.degree}
-                    </div>
-                    <div className="text-gray-500 text-sm truncate">{user.email}</div>
-                    <div className="text-xs text-blue-600 font-medium mt-1">
-                      {getRoleText(user.role)}
-                    </div>
-                    {/* Tahun Ajaran di Dropdown */}
-                    {academicYear.name && (
-                      <div className="mt-2 pt-2 border-t border-gray-100">
-                        <div className="text-xs text-gray-500">Tahun Ajaran:</div>
-                        <div className="text-sm font-medium text-gray-700">
-                          {academicYear.name} - {academicYear.periode}
+                <div
+                  role="menu"
+                  className="absolute right-0 z-50 mt-2 w-72 origin-top-right overflow-hidden rounded-xl animate-fade-in"
+                  style={{
+                    background: "var(--sipta-surface-elevated)",
+                    border: "1px solid var(--sipta-border)",
+                    boxShadow: "var(--shadow-lg)",
+                  }}
+                  data-testid="header-profile-menu"
+                >
+                  <div
+                    className="p-4"
+                    style={{ borderBottom: "1px solid var(--sipta-border)" }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-semibold"
+                        style={{
+                          background: "var(--sipta-primary-subtle)",
+                          color: "var(--sipta-primary)",
+                        }}
+                        aria-hidden="true"
+                      >
+                        {initials}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div
+                          className="truncate text-sm font-semibold"
+                          style={{ color: "var(--sipta-foreground)" }}
+                        >
+                          {user.fullname} {user.degree}
+                        </div>
+                        <div
+                          className="truncate text-xs"
+                          style={{ color: "var(--sipta-muted-fg)" }}
+                        >
+                          {user.email}
                         </div>
                       </div>
-                    )}
+                    </div>
+                    <div className="mt-3 flex items-center gap-2">
+                      <span
+                        className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                        style={{
+                          background: "var(--sipta-primary-subtle)",
+                          color: "var(--sipta-primary)",
+                        }}
+                      >
+                        {roleLabel(user.role)}
+                      </span>
+                      {academicYear.name && (
+                        <span
+                          className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-medium tabular-nums"
+                          style={{
+                            background: "var(--sipta-surface-3)",
+                            color: "var(--sipta-muted-fg)",
+                          }}
+                        >
+                          T.A. {academicYear.name}
+                          {academicYear.periode
+                            ? ` · ${academicYear.periode}`
+                            : ""}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Simple Menu - Only Profile and Logout */}
-                  <div className="py-2">
+                  <div className="py-1.5">
                     <Link
                       href="/profile"
-                      className="flex items-center space-x-3 px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                      role="menuitem"
                       onClick={() => setIsProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2 text-sm transition-colors"
+                      style={{ color: "var(--sipta-foreground)" }}
+                      data-testid="header-profile-link"
                     >
-                      <UserCircleIcon className="h-5 w-5" />
-                      <span>Profil Saya</span>
+                      <UserCircleIcon className="h-5 w-5" aria-hidden="true" />
+                      <span>Profil saya</span>
                     </Link>
-
                     <button
+                      type="button"
+                      role="menuitem"
                       onClick={handleLogoutClick}
-                      className="flex items-center space-x-3 w-full px-4 py-2 text-red-600 hover:bg-red-50 transition-colors"
+                      className="flex w-full items-center gap-3 px-4 py-2 text-sm transition-colors"
+                      style={{ color: "var(--sipta-destructive)" }}
+                      data-testid="header-logout-button"
                     >
-                      <ArrowRightOnRectangleIcon className="h-5 w-5" />
+                      <ArrowRightOnRectangleIcon
+                        className="h-5 w-5"
+                        aria-hidden="true"
+                      />
                       <span>Keluar</span>
                     </button>
                   </div>
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Mobile Navigation */}
-          <div className="flex md:hidden items-center justify-between mt-4 pt-4 border-t border-white/20">
-            
-
-            <Link
-              href="/"
-              className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors ${
-                isActiveRoute('/') 
-                  ? 'bg-white/20 text-white' 
-                  : 'text-blue-100 hover:bg-white/10 hover:text-white'
-              }`}
+            {/* Mobile hamburger */}
+            <button
+              type="button"
+              onClick={() => setMobileOpen((v) => !v)}
+              className="ml-1 inline-flex h-9 w-9 items-center justify-center rounded-lg md:hidden transition-colors"
+              style={{
+                border: "1px solid var(--sipta-border)",
+                color: "var(--sipta-foreground)",
+                background: "var(--sipta-surface)",
+              }}
+              aria-label={mobileOpen ? "Tutup menu" : "Buka menu"}
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-nav"
+              data-testid="header-mobile-toggle"
             >
-              <HomeIcon className="h-5 w-5" />
-              <span className="text-xs">Home</span>
-            </Link>
-
-            {user.role === 'admin' && (
-              <Link
-                href="/teachers"
-                className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors ${
-                  isActiveRoute('/teachers') 
-                    ? 'bg-white/20 text-white' 
-                    : 'text-blue-100 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <UserGroupIcon className="h-5 w-5" />
-                <span className="text-xs">Guru</span>
-              </Link>
-            )}
-
-            <Link
-              href="/classroom"
-              className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors ${
-                isActiveRoute('/classroom') 
-                  ? 'bg-white/20 text-white' 
-                  : 'text-blue-100 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              <AcademicCapIcon className="h-5 w-5" />
-              <span className="text-xs">Kelas</span>
-            </Link>
-
-            <Link
-              href="/schedules"
-              className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors ${
-                isActiveRoute('/schedules') 
-                  ? 'bg-white/20 text-white' 
-                  : 'text-blue-100 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              <CalendarIcon className="h-5 w-5" />
-              <span className="text-xs">Jadwal</span>
-            </Link>
-
-            <Link
-              href="/reports"
-              className={`flex flex-col items-center space-y-1 px-3 py-2 rounded-lg transition-colors ${
-                isActiveRoute('/reports') 
-                  ? 'bg-white/20 text-white' 
-                  : 'text-blue-100 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              <ClipboardDocumentListIcon className="h-5 w-5" />
-              <span className="text-xs">Laporan</span>
-            </Link>
+              {mobileOpen ? (
+                <XMarkIcon className="h-5 w-5" />
+              ) : (
+                <Bars3Icon className="h-5 w-5" />
+              )}
+            </button>
           </div>
         </div>
 
-        {/* Overlay */}
+        {/* Mobile drawer */}
+        {mobileOpen && (
+          <nav
+            id="mobile-nav"
+            className="md:hidden animate-fade-in"
+            aria-label="Navigasi mobile"
+            style={{
+              background: "var(--sipta-surface)",
+              borderTop: "1px solid var(--sipta-border)",
+            }}
+            data-testid="mobile-nav"
+          >
+            <ul className="mx-auto grid max-w-7xl gap-1 px-3 py-3 sm:px-4">
+              {visibleNav.map(({ href, label, Icon, testId }) => {
+                const active = isActiveRoute(href);
+                return (
+                  <li key={href}>
+                    <Link
+                      href={href}
+                      onClick={() => setMobileOpen(false)}
+                      aria-current={active ? "page" : undefined}
+                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
+                      style={{
+                        color: active
+                          ? "var(--sipta-foreground)"
+                          : "var(--sipta-muted-fg)",
+                        background: active
+                          ? "var(--sipta-primary-subtle)"
+                          : "transparent",
+                      }}
+                      data-testid={`mobile-${testId}`}
+                    >
+                      <Icon
+                        className={
+                          active
+                            ? "h-5 w-5 text-[var(--sipta-primary)]"
+                            : "h-5 w-5 text-[var(--sipta-muted-fg)]"
+                        }
+                      />
+                      <span>{label}</span>
+                      {active && (
+                        <span
+                          className="ml-auto h-1.5 w-1.5 rounded-full"
+                          style={{ background: "var(--sipta-primary)" }}
+                          aria-hidden="true"
+                        />
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+        )}
+
+        {/* Overlay to close profile menu */}
         {isProfileOpen && (
           <div
-            className="fixed inset-0 z-40"
+            className="fixed inset-0 z-30"
             onClick={() => setIsProfileOpen(false)}
+            aria-hidden="true"
           />
         )}
       </header>
 
-      {/* Logout Confirmation Modal */}
+      {/* Logout confirmation */}
       {showLogoutConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{
+            background:
+              "color-mix(in oklch, var(--sipta-foreground) 45%, transparent)",
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="logout-title"
+          data-testid="logout-confirm-dialog"
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-2xl animate-fade-in"
+            style={{
+              background: "var(--sipta-surface-elevated)",
+              border: "1px solid var(--sipta-border)",
+              boxShadow: "var(--shadow-xl)",
+            }}
+          >
             <div className="p-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="bg-red-100 p-2 rounded-full">
-                  <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
+              <div className="flex items-start gap-3">
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                  style={{
+                    background: "var(--sipta-destructive-subtle)",
+                    color: "var(--sipta-destructive)",
+                  }}
+                  aria-hidden="true"
+                >
+                  <ExclamationTriangleIcon className="h-5 w-5" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Konfirmasi Keluar
-                </h3>
+                <div className="min-w-0">
+                  <h3
+                    id="logout-title"
+                    className="text-base font-semibold"
+                    style={{ color: "var(--sipta-foreground)" }}
+                  >
+                    Konfirmasi keluar
+                  </h3>
+                  <p
+                    className="mt-1.5 text-sm leading-relaxed"
+                    style={{ color: "var(--sipta-muted-fg)" }}
+                  >
+                    Anda akan keluar dari sesi ini. Login kembali diperlukan
+                    untuk mengakses SIPTA.
+                  </p>
+                </div>
               </div>
-              
-              <p className="text-gray-600 mb-6">
-                Apakah Anda yakin ingin keluar dari akun? Anda perlu login kembali untuk mengakses sistem.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row sm:space-x-3 space-y-2 sm:space-y-0 justify-end">
+
+              <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <button
+                  type="button"
                   onClick={handleCancelLogout}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors rounded-lg border border-gray-300 hover:border-gray-400"
+                  className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                  style={{
+                    border: "1px solid var(--sipta-border)",
+                    color: "var(--sipta-foreground)",
+                    background: "var(--sipta-surface)",
+                  }}
+                  data-testid="logout-cancel-button"
                 >
                   Batal
                 </button>
                 <button
+                  type="button"
                   onClick={handleConfirmLogout}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors"
+                  className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
+                  style={{
+                    background: "var(--sipta-destructive)",
+                    color: "var(--sipta-destructive-fg)",
+                  }}
+                  data-testid="logout-confirm-button"
                 >
-                  Ya, Keluar
+                  Ya, keluar
                 </button>
               </div>
             </div>
@@ -364,7 +571,7 @@ function HeaderComponent() {
         </div>
       )}
     </>
-  )
+  );
 }
 
-export default HeaderComponent  
+export default HeaderComponent;

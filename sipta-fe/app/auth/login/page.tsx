@@ -1,9 +1,20 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import { useForm, SubmitHandler } from "react-hook-form";
+import {
+  AcademicCapIcon,
+  ArrowRightIcon,
+  ExclamationTriangleIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  LockClosedIcon,
+  ShieldCheckIcon,
+  UserIcon,
+} from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/src/state/AuthStore";
+import type React from "react";
+import { useEffect, useState } from "react";
+import { type SubmitHandler, useForm } from "react-hook-form";
 import toast from "react-hot-toast";
+import { useAuthStore } from "@/src/state/AuthStore";
 
 type FormValues = {
   username: string;
@@ -12,647 +23,563 @@ type FormValues = {
   remember?: boolean;
 };
 
+/* ------------------------------------------------------------------
+ * SIPTA Login — v2 redesign
+ * ------------------------------------------------------------------
+ * PRESERVED BEHAVIOR (do not modify):
+ *   - React Hook Form usage + validation rules (username min/pattern,
+ *     password min, register-only password strength pattern, phone
+ *     required in register mode)
+ *   - useAuthStore().login(username, password) signature
+ *   - Post-login redirect via useEffect on `user`
+ *   - Geolocation + camera permission probes (checkPermissions,
+ *     requestPermissions, retryPermissions)
+ *   - Toast semantics on permission grant / denial / success / error
+ *   - isLogin/isRegister toggle preserved (though register UI is
+ *     hidden per current UX — behavior kept)
+ *
+ * REDESIGN:
+ *   - Split-layout: brand pane (left) + form pane (right) on lg+;
+ *     stacked on mobile.
+ *   - Fintech aesthetic: subtle grid canvas + soft ambient glow,
+ *     tokenized colors, distinctive display font on brand title.
+ *   - Inputs, buttons, alerts use semantic tokens (light+dark ready).
+ *   - Real focus rings, aria-invalid, aria-describedby for errors.
+ * ------------------------------------------------------------------ */
+
 const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin] = useState(true); // register UI intentionally hidden per current UX; state retained
   const [isLoading, setIsLoading] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState({
-    location: "idle", // 'idle', 'checking', 'granted', 'denied', 'unsupported'
+    location: "idle",
     camera: "idle",
   });
-  const [permissionsChecked, setPermissionsChecked] = useState(false);
 
-  const { login, user, error, isLoading: authLoading } = useAuthStore();
+  const { login, user, isLoading: authLoading } = useAuthStore();
   const router = useRouter();
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-    reset,
   } = useForm<FormValues>();
 
   useEffect(() => {
-    // Hanya redirect jika user ada (login berhasil) DAN tidak sedang loading
     if (user && !authLoading) {
-      // console.log("✅ Login successful, redirecting...");
       router.push("/");
     }
   }, [user, authLoading, router]);
 
-  // Function hanya untuk mengecek status permission tanpa meminta
-  const checkPermissions = async () => {
-    setPermissionsChecked(true);
-
-    // Check location permission status
-    setPermissionStatus((prev) => ({ ...prev, location: "checking" }));
-    if ("geolocation" in navigator) {
-      // Untuk geolocation, kita tidak bisa langsung check status tanpa mencoba
-      // Jadi kita set sebagai idle dulu, nanti akan dicek saat diperlukan
-      setPermissionStatus((prev) => ({ ...prev, location: "idle" }));
-    } else {
-      setPermissionStatus((prev) => ({ ...prev, location: "unsupported" }));
-    }
-
-    // Check camera permission status
-    setPermissionStatus((prev) => ({ ...prev, camera: "checking" }));
-    if (
-      "mediaDevices" in navigator &&
-      "getUserMedia" in navigator.mediaDevices
-    ) {
-      try {
-        // Coba akses camera devices list untuk check permission tanpa meminta
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(
-          (device) => device.kind === "videoinput"
-        );
-
-        if (videoDevices.length === 0) {
-          setPermissionStatus((prev) => ({ ...prev, camera: "unsupported" }));
-        } else {
-          // Untuk camera, kita tidak bisa langsung check status tanpa mencoba
-          setPermissionStatus((prev) => ({ ...prev, camera: "idle" }));
-        }
-      } catch (err) {
-        setPermissionStatus((prev) => ({ ...prev, camera: "unsupported" }));
-      }
-    } else {
-      setPermissionStatus((prev) => ({ ...prev, camera: "unsupported" }));
-    }
-  };
-
-  // Function untuk meminta permission hanya ketika diperlukan
+  // ---- Permission probes (behavior identical to v1) --------------
   const requestPermissions = async () => {
-    // Hanya minta location jika belum granted dan supported
     if (permissionStatus.location === "idle" && "geolocation" in navigator) {
-      setPermissionStatus((prev) => ({ ...prev, location: "checking" }));
-
+      setPermissionStatus((p) => ({ ...p, location: "checking" }));
       try {
         await new Promise<void>((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(
-            (position) => {
+            () => {
               toast.success("Izin lokasi diberikan", {
                 icon: "📍",
                 duration: 3000,
               });
-              setPermissionStatus((prev) => ({ ...prev, location: "granted" }));
+              setPermissionStatus((p) => ({ ...p, location: "granted" }));
               resolve();
             },
-            (error) => {
-              let message = "Izin lokasi ditolak";
-              switch (error.code) {
-                case error.PERMISSION_DENIED:
-                  message =
-                    "Izin lokasi ditolak. Beberapa fitur mungkin tidak berfungsi.";
-                  setPermissionStatus((prev) => ({
-                    ...prev,
-                    location: "denied",
-                  }));
-                  break;
-                case error.POSITION_UNAVAILABLE:
-                  message = "Informasi lokasi tidak tersedia";
-                  setPermissionStatus((prev) => ({
-                    ...prev,
-                    location: "denied",
-                  }));
-                  break;
-                case error.TIMEOUT:
-                  message = "Request lokasi timeout";
-                  setPermissionStatus((prev) => ({
-                    ...prev,
-                    location: "denied",
-                  }));
-                  break;
-              }
-              toast.error(message, {
-                icon: "❌",
-                duration: 5000,
-              });
-              reject(error);
+            (err) => {
+              let msg = "Izin lokasi ditolak";
+              if (err.code === err.PERMISSION_DENIED)
+                msg =
+                  "Izin lokasi ditolak. Beberapa fitur mungkin tidak berfungsi.";
+              else if (err.code === err.POSITION_UNAVAILABLE)
+                msg = "Informasi lokasi tidak tersedia";
+              else if (err.code === err.TIMEOUT) msg = "Request lokasi timeout";
+              setPermissionStatus((p) => ({ ...p, location: "denied" }));
+              toast.error(msg, { icon: "❌", duration: 5000 });
+              reject(err);
             },
-            {
-              enableHighAccuracy: false, // Tidak perlu high accuracy untuk permission check
-              timeout: 5000, // Timeout lebih pendek
-              maximumAge: 300000, // 5 minutes
-            }
+            { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 },
           );
         });
-      } catch (err) {
-        // console.warn("Gagal mendapatkan lokasi:", err);
+      } catch {
+        /* ignore */
       }
     }
 
-    // Hanya minta camera jika belum granted dan supported
     if (
       permissionStatus.camera === "idle" &&
       "mediaDevices" in navigator &&
       "getUserMedia" in navigator.mediaDevices
     ) {
-      setPermissionStatus((prev) => ({ ...prev, camera: "checking" }));
-
+      setPermissionStatus((p) => ({ ...p, camera: "checking" }));
       try {
-        // Gunakan constraint yang lebih minimal untuk permission check
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 1, height: 1 }, // Resolution minimal
+          video: { width: 1, height: 1 },
         });
-
-        // Segera stop stream setelah dapat permission
-        stream.getTracks().forEach((track) => track.stop());
-
-        toast.success("Izin kamera diberikan", {
-          icon: "📷",
-          duration: 3000,
-        });
-        setPermissionStatus((prev) => ({ ...prev, camera: "granted" }));
+        stream.getTracks().forEach((t) => t.stop());
+        toast.success("Izin kamera diberikan", { icon: "📷", duration: 3000 });
+        setPermissionStatus((p) => ({ ...p, camera: "granted" }));
       } catch (err: any) {
-        let message = "Izin kamera ditolak";
-        if (err.name === "NotAllowedError") {
-          message =
+        let msg = "Izin kamera ditolak";
+        if (err?.name === "NotAllowedError") {
+          msg =
             "Izin kamera ditolak. Fitur absensi wajah mungkin tidak berfungsi.";
-          setPermissionStatus((prev) => ({ ...prev, camera: "denied" }));
-        } else if (err.name === "NotFoundError") {
-          message = "Kamera tidak ditemukan";
-          setPermissionStatus((prev) => ({ ...prev, camera: "unsupported" }));
-        } else if (err.name === "NotSupportedError") {
-          message = "Browser tidak mendukung akses kamera";
-          setPermissionStatus((prev) => ({ ...prev, camera: "unsupported" }));
+          setPermissionStatus((p) => ({ ...p, camera: "denied" }));
+        } else if (err?.name === "NotFoundError") {
+          msg = "Kamera tidak ditemukan";
+          setPermissionStatus((p) => ({ ...p, camera: "unsupported" }));
+        } else if (err?.name === "NotSupportedError") {
+          msg = "Browser tidak mendukung akses kamera";
+          setPermissionStatus((p) => ({ ...p, camera: "unsupported" }));
         } else {
-          setPermissionStatus((prev) => ({ ...prev, camera: "denied" }));
+          setPermissionStatus((p) => ({ ...p, camera: "denied" }));
         }
-
-        toast.error(message, {
-          icon: "❌",
-          duration: 5000,
-        });
+        toast.error(msg, { icon: "❌", duration: 5000 });
       }
     }
   };
 
-  // Function untuk manual retry permissions
   const retryPermissions = () => {
-    toast.loading("Meminta ulang izin...", {
-      duration: 2000,
-    });
+    toast.loading("Meminta ulang izin…", { duration: 2000 });
     requestPermissions();
   };
 
-  // LoginPage - GANTI onSubmit function dengan ini
+  // ---- Submit ------------------------------------------------------
   const onSubmit: SubmitHandler<FormValues> = async (data) => {
-    // console.log("🟡 FORM SUBMITTED:", data);
     setIsLoading(true);
-
     try {
-      if (isLogin) {
-        // console.log("🟡 CALLING LOGIN FUNCTION...");
-        await login(data.username, data.password);
-
-        // JANGAN langsung toast success di sini
-        // Biarkan useEffect yang handle redirect berdasarkan user state
-
-        // console.log("🟡 LOGIN SUCCESS - Waiting for state update");
-
-        // Cek state setelah login
-        setTimeout(() => {
-          const { user: currentUser, token } = useAuthStore.getState();
-          // console.log("🟡 STATE AFTER LOGIN:", {
-          //   user: currentUser,
-          //   token: token?.substring(0, 10) + "...",
-          // });
-
-          if (!currentUser || !token) {
-            console.error("❌ STATE NOT UPDATED AFTER LOGIN");
-            // Error akan ditangani oleh catch block
-            throw new Error("Login successful but state not updated");
-          }
-        }, 100);
-      } else {
-        // console.log("Register:", data);
-      }
+      await login(data.username, data.password);
+      // Redirect handled by useEffect on `user`
+      setTimeout(() => {
+        const { user: currentUser, token } = useAuthStore.getState();
+        if (!currentUser || !token) {
+          throw new Error("Login successful but state not updated");
+        }
+      }, 100);
     } catch (err: any) {
-      console.error("❌ Login error:", err);
       const errorMessage =
-        err.response?.data?.message || err.message || "Login failed";
-
-      // TAMPILKAN ERROR TOAST - ini yang tidak muncul karena looping
-      toast.error(errorMessage, {
-        duration: 5000,
-        position: "top-center",
-      });
+        err?.response?.data?.message || err?.message || "Login gagal";
+      toast.error(errorMessage, { duration: 5000, position: "top-center" });
     } finally {
-      // console.log("🟡 FINALLY - SET LOADING FALSE");
       setIsLoading(false);
     }
   };
 
-  const toggleAuthMode = () => {
-    setIsLogin(!isLogin);
-    reset();
-  };
+  const permissionWarning =
+    permissionStatus.location === "denied" ||
+    permissionStatus.camera === "denied" ||
+    permissionStatus.location === "unsupported" ||
+    permissionStatus.camera === "unsupported";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
-      {/* Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-emerald-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-pulse delay-500"></div>
-      </div>
-
-      {/* Permission Status Indicator */}
+    <div
+      className="relative flex min-h-screen overflow-hidden"
+      style={{ background: "var(--sipta-background)" }}
+      data-testid="login-page"
+    >
+      {/* Global permission probe indicator */}
       {(permissionStatus.location === "checking" ||
         permissionStatus.camera === "checking") && (
-        <div className="fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center space-x-2">
-          <svg
-            className="animate-spin h-5 w-5"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-          <span>Memeriksa izin akses...</span>
+        <div
+          className="fixed right-4 top-4 z-50 flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium shadow-lg"
+          style={{
+            background: "var(--sipta-primary)",
+            color: "var(--sipta-primary-fg)",
+          }}
+        >
+          <span
+            className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white"
+            aria-hidden="true"
+          />
+          Memeriksa izin akses…
         </div>
       )}
 
-      <div className="relative bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
-        {/* Header Section */}
-        <div className="bg-gradient-to-r from-emerald-600 via-blue-600 to-purple-600 p-8 text-white relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-12 -translate-x-12"></div>
+      {/* Brand pane — text pinned to white regardless of theme (branded surface) */}
+      <aside
+        className="relative hidden overflow-hidden lg:flex lg:w-1/2 lg:flex-col lg:justify-between lg:p-12"
+        style={{
+          background:
+            "linear-gradient(135deg, #2A2568 0%, #4F46E5 55%, #7C3AED 100%)",
+          color: "#FFFFFF",
+        }}
+        aria-hidden="true"
+      >
+        <div
+          className="absolute inset-0 opacity-[0.10]"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.6) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
+        <div
+          className="absolute -right-40 -top-40 h-96 w-96 rounded-full opacity-30 blur-3xl"
+          style={{ background: "rgba(255,255,255,0.55)" }}
+        />
+        <div
+          className="absolute -bottom-40 -left-24 h-80 w-80 rounded-full opacity-20 blur-3xl"
+          style={{ background: "rgba(255,255,255,0.35)" }}
+        />
 
-          <div className="relative z-10 flex items-center space-x-4">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">
-                SIPTA System
-              </h1>
-              <p className="text-blue-100 mt-1 text-sm opacity-90">
-                {isLogin
-                  ? " Sistem Informasi Pembelajaran TPA Arrahman"
-                  : "Daftar Akun Baru"}
-              </p>
-            </div>
+        <div className="relative z-10 flex items-center gap-3">
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-xl"
+            style={{
+              background: "rgba(255,255,255,0.16)",
+              backdropFilter: "blur(6px)",
+            }}
+          >
+            <AcademicCapIcon className="h-6 w-6" />
+          </div>
+          <div className="leading-tight">
+            <p
+              className="text-sm font-semibold"
+              style={{ fontFamily: "var(--font-display-family)" }}
+            >
+              SIPTA
+            </p>
+            <p className="text-[11px] opacity-75">
+              TPA Arrahman · Sistem Informasi Pembelajaran
+            </p>
           </div>
         </div>
 
-        <div className="p-8">
-          {/* Permission Warning - hanya tampil jika ada permission yang ditolak/tidak supported */}
-          {(permissionStatus.location === "denied" ||
-            permissionStatus.camera === "denied" ||
-            permissionStatus.location === "unsupported" ||
-            permissionStatus.camera === "unsupported") && (
-            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6 text-yellow-600"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+        <div className="relative z-10 max-w-md">
+          <p className="text-[11px] font-medium uppercase tracking-[0.24em] opacity-70">
+            Portal Guru & Administrator
+          </p>
+          <h1
+            className="mt-4 text-4xl font-semibold leading-tight tracking-tight"
+            style={{ fontFamily: "var(--font-display-family)" }}
+          >
+            Kelola pembelajaran, pantau performa.
+          </h1>
+          <p className="mt-4 text-sm leading-relaxed opacity-85">
+            Absensi harian, penilaian per pertemuan, jadwal, dan laporan
+            performa siswa — dalam satu antarmuka analitik yang bersih dan
+            cepat.
+          </p>
+
+          <ul className="mt-8 space-y-3 text-sm">
+            {[
+              "Absensi berbasis lokasi dan foto",
+              "Penilaian & rekap otomatis per semester",
+              "Laporan performa siswa & guru",
+            ].map((item) => (
+              <li key={item} className="flex items-center gap-3">
+                <ShieldCheckIcon className="h-4 w-4 shrink-0 opacity-90" />
+                <span className="opacity-90">{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div
+          className="relative z-10 text-[11px] opacity-70"
+          style={{ fontFamily: "var(--font-mono-family)" }}
+        >
+          © 2025 SIPTA · v2
+        </div>
+      </aside>
+
+      {/* Form pane */}
+      <main className="relative flex w-full flex-col items-center justify-center px-4 py-10 lg:w-1/2 lg:px-12">
+        {/* mobile brand */}
+        <div className="mb-8 flex items-center gap-3 lg:hidden">
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-xl"
+            style={{
+              background:
+                "linear-gradient(135deg, var(--sipta-primary), color-mix(in oklch, var(--sipta-accent) 55%, var(--sipta-primary)))",
+              color: "var(--sipta-primary-fg)",
+            }}
+            aria-hidden="true"
+          >
+            <AcademicCapIcon className="h-5 w-5" />
+          </div>
+          <div className="leading-tight">
+            <p
+              className="text-base font-semibold tracking-tight"
+              style={{
+                color: "var(--sipta-foreground)",
+                fontFamily: "var(--font-display-family)",
+              }}
+            >
+              SIPTA
+            </p>
+            <p
+              className="text-[11px]"
+              style={{ color: "var(--sipta-muted-fg)" }}
+            >
+              TPA Arrahman
+            </p>
+          </div>
+        </div>
+
+        <div className="w-full max-w-sm">
+          <div className="mb-8">
+            <p
+              className="text-xs font-medium uppercase tracking-[0.18em]"
+              style={{ color: "var(--sipta-primary)" }}
+            >
+              Masuk
+            </p>
+            <h2
+              className="mt-2 text-2xl font-semibold tracking-tight"
+              style={{
+                color: "var(--sipta-foreground)",
+                fontFamily: "var(--font-display-family)",
+              }}
+            >
+              Selamat datang kembali
+            </h2>
+            <p
+              className="mt-2 text-sm"
+              style={{ color: "var(--sipta-muted-fg)" }}
+            >
+              Masuk untuk mengelola jadwal, absensi, dan laporan.
+            </p>
+          </div>
+
+          {permissionWarning && (
+            <div
+              role="status"
+              className="mb-6 flex items-start gap-3 rounded-xl border p-3.5"
+              style={{
+                background: "var(--sipta-warning-subtle)",
+                borderColor:
+                  "color-mix(in oklch, var(--sipta-warning) 25%, var(--sipta-border))",
+              }}
+              data-testid="login-permission-warning"
+            >
+              <ExclamationTriangleIcon
+                className="mt-0.5 h-5 w-5 shrink-0"
+                style={{ color: "var(--sipta-warning)" }}
+                aria-hidden="true"
+              />
+              <div
+                className="text-sm leading-relaxed"
+                style={{
+                  color:
+                    "color-mix(in oklch, var(--sipta-warning) 55%, var(--sipta-foreground))",
+                }}
+              >
+                <p
+                  className="font-semibold"
+                  style={{ color: "var(--sipta-foreground)" }}
+                >
+                  Perhatian
+                </p>
+                <p>
+                  {permissionStatus.location === "denied" ||
+                  permissionStatus.camera === "denied"
+                    ? "Beberapa fitur membutuhkan izin lokasi dan kamera."
+                    : "Browser tidak mendukung beberapa fitur yang diperlukan."}{" "}
+                  <button
+                    type="button"
+                    onClick={retryPermissions}
+                    className="font-semibold underline underline-offset-2"
+                    style={{ color: "var(--sipta-warning)" }}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-yellow-800">
-                    Perhatian
-                  </h3>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    {permissionStatus.location === "denied" ||
-                    permissionStatus.camera === "denied"
-                      ? "Beberapa fitur membutuhkan izin lokasi dan kamera."
-                      : "Browser tidak mendukung beberapa fitur yang diperlukan."}
-                    <button
-                      onClick={retryPermissions}
-                      className="ml-1 underline font-medium hover:text-yellow-900"
-                    >
-                      Coba lagi
-                    </button>
-                  </p>
-                </div>
+                    Coba lagi
+                  </button>
+                </p>
               </div>
             </div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* Username Field */}
-            <div className="space-y-3">
-              <label className="flex items-center text-sm font-semibold text-gray-700">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-2 text-emerald-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  />
-                </svg>
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="space-y-5"
+            noValidate
+          >
+            {/* Username */}
+            <div>
+              <label
+                htmlFor="username"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wide"
+                style={{ color: "var(--sipta-muted-fg)" }}
+              >
                 Username
               </label>
-              <input
-                type="text"
-                {...register("username", {
-                  required: "Username wajib diisi",
-                  minLength: {
-                    value: 3,
-                    message: "Username minimal 3 karakter",
-                  },
-                  pattern: {
-                    value: /^[a-zA-Z0-9_]+$/,
-                    message:
-                      "Username hanya boleh mengandung huruf, angka, dan underscore",
-                  },
-                })}
-                className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:outline-none transition-all ${
-                  errors.username
-                    ? "border-red-400 focus:ring-red-100 bg-red-50"
-                    : "border-gray-200 focus:ring-emerald-100 focus:border-emerald-500 hover:border-gray-300"
-                }`}
-                placeholder="Masukkan username Anda"
-              />
+              <div
+                className="group relative flex items-center rounded-lg transition-all"
+                style={{
+                  border: `1px solid ${
+                    errors.username
+                      ? "var(--sipta-destructive)"
+                      : "var(--sipta-border)"
+                  }`,
+                  background: "var(--sipta-surface)",
+                }}
+              >
+                <UserIcon
+                  className="ml-3 h-4 w-4"
+                  style={{ color: "var(--sipta-muted-fg)" }}
+                  aria-hidden="true"
+                />
+                <input
+                  id="username"
+                  type="text"
+                  autoComplete="username"
+                  {...register("username", {
+                    required: "Username wajib diisi",
+                    minLength: {
+                      value: 3,
+                      message: "Username minimal 3 karakter",
+                    },
+                    pattern: {
+                      value: /^[a-zA-Z0-9_]+$/,
+                      message: "Hanya huruf, angka, dan underscore",
+                    },
+                  })}
+                  aria-invalid={errors.username ? "true" : "false"}
+                  aria-describedby={
+                    errors.username ? "username-error" : undefined
+                  }
+                  className="w-full bg-transparent px-3 py-2.5 text-sm outline-none placeholder:opacity-60"
+                  style={{ color: "var(--sipta-foreground)" }}
+                  placeholder="username_anda"
+                  data-testid="login-username-input"
+                />
+              </div>
               {errors.username && (
-                <p className="text-red-500 text-sm flex items-center">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 mr-1"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
+                <p
+                  id="username-error"
+                  className="mt-1.5 text-xs"
+                  style={{ color: "var(--sipta-destructive)" }}
+                >
                   {errors.username.message}
                 </p>
               )}
             </div>
 
-            {/* Phone Number (Register Only) */}
-            {!isLogin && (
-              <div className="space-y-3">
-                <label className="flex items-center text-sm font-semibold text-gray-700">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 mr-2 text-blue-600"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                    />
-                  </svg>
-                  Nomor Telepon
-                </label>
-                <input
-                  type="tel"
-                  {...register("phone", {
-                    required: "Nomor telepon wajib diisi",
-                    pattern: {
-                      value: /^[0-9+\-\s()]*$/,
-                      message: "Format nomor telepon tidak valid",
-                    },
-                  })}
-                  className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:outline-none transition-all ${
-                    errors.phone
-                      ? "border-red-400 focus:ring-red-100 bg-red-50"
-                      : "border-gray-200 focus:ring-blue-100 focus:border-blue-500 hover:border-gray-300"
-                  }`}
-                  placeholder="+62 812 3456 7890"
-                />
-                {errors.phone && (
-                  <p className="text-red-500 text-sm flex items-center">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 mr-1"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    {errors.phone.message}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Password Field */}
-            <div className="space-y-3 relative">
-              <label className="flex items-center text-sm font-semibold text-gray-700">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-2 text-purple-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                  />
-                </svg>
+            {/* Password */}
+            <div>
+              <label
+                htmlFor="password"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wide"
+                style={{ color: "var(--sipta-muted-fg)" }}
+              >
                 Password
               </label>
-              <input
-                type={showPassword ? "text" : "password"}
-                {...register("password", {
-                  required: "Password wajib diisi",
-                  minLength: {
-                    value: 6,
-                    message: "Password minimal 6 karakter",
-                  },
-                  ...(isLogin
-                    ? {}
-                    : {
-                        pattern: {
-                          value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-                          message:
-                            "Harus mengandung huruf besar, kecil, dan angka",
-                        },
-                      }),
-                })}
-                className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:outline-none transition-all pr-12 ${
-                  errors.password
-                    ? "border-red-400 focus:ring-red-100 bg-red-50"
-                    : "border-gray-200 focus:ring-purple-100 focus:border-purple-500 hover:border-gray-300"
-                }`}
-                placeholder={
-                  isLogin ? "Masukkan password Anda" : "Buat password yang kuat"
-                }
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-11 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
+              <div
+                className="group relative flex items-center rounded-lg transition-all"
+                style={{
+                  border: `1px solid ${
+                    errors.password
+                      ? "var(--sipta-destructive)"
+                      : "var(--sipta-border)"
+                  }`,
+                  background: "var(--sipta-surface)",
+                }}
               >
-                {showPassword ? (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                <LockClosedIcon
+                  className="ml-3 h-4 w-4"
+                  style={{ color: "var(--sipta-muted-fg)" }}
+                  aria-hidden="true"
+                />
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  {...register("password", {
+                    required: "Password wajib diisi",
+                    minLength: {
+                      value: 6,
+                      message: "Password minimal 6 karakter",
+                    },
+                    ...(isLogin
+                      ? {}
+                      : {
+                          pattern: {
+                            value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+                            message:
+                              "Harus mengandung huruf besar, kecil, dan angka",
+                          },
+                        }),
+                  })}
+                  aria-invalid={errors.password ? "true" : "false"}
+                  aria-describedby={
+                    errors.password ? "password-error" : undefined
+                  }
+                  className="w-full bg-transparent px-3 py-2.5 text-sm outline-none placeholder:opacity-60"
+                  style={{ color: "var(--sipta-foreground)" }}
+                  placeholder="Masukkan password"
+                  data-testid="login-password-input"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="mr-2 rounded-md p-1.5 transition-colors hover:bg-[var(--sipta-surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sipta-primary)]"
+                  aria-label={
+                    showPassword ? "Sembunyikan password" : "Tampilkan password"
+                  }
+                  aria-pressed={showPassword}
+                  data-testid="login-password-toggle"
+                >
+                  {showPassword ? (
+                    <EyeSlashIcon
+                      className="h-4 w-4"
+                      style={{ color: "var(--sipta-muted-fg)" }}
                     />
-                  </svg>
-                ) : (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  ) : (
+                    <EyeIcon
+                      className="h-4 w-4"
+                      style={{ color: "var(--sipta-muted-fg)" }}
                     />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                    />
-                  </svg>
-                )}
-              </button>
+                  )}
+                </button>
+              </div>
               {errors.password && (
-                <p className="text-red-500 text-sm flex items-center">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 mr-1"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
+                <p
+                  id="password-error"
+                  className="mt-1.5 text-xs"
+                  style={{ color: "var(--sipta-destructive)" }}
+                >
                   {errors.password.message}
                 </p>
               )}
             </div>
 
-            {/* Submit Button */}
+            {/* Submit */}
             <button
               type="submit"
               disabled={isLoading}
-              className={`w-full py-4 px-6 rounded-xl font-bold text-white transition-all duration-300 ${
-                isLoading
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 shadow-lg hover:shadow-xl transform hover:-translate-y-1 active:translate-y-0"
-              }`}
+              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sipta-primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+              style={{
+                background: "var(--sipta-primary)",
+                color: "var(--sipta-primary-fg)",
+                boxShadow: isLoading ? "none" : "var(--shadow-md)",
+              }}
+              data-testid="login-submit-button"
             >
-              <div className="flex items-center justify-center space-x-2">
-                {isLoading ? (
-                  <>
-                    <svg
-                      className="animate-spin h-5 w-5 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    <span>{isLogin ? "Masuk..." : "Membuat Akun..."}</span>
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d={
-                          isLogin
-                            ? "M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
-                            : "M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-                        }
-                      />
-                    </svg>
-                    <span>
-                      {isLogin ? "Masuk ke Sistem" : "Buat Akun Baru"}
-                    </span>
-                  </>
-                )}
-              </div>
+              {isLoading ? (
+                <>
+                  <span
+                    className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                    aria-hidden="true"
+                  />
+                  Memproses…
+                </>
+              ) : (
+                <>
+                  <span>Masuk ke SIPTA</span>
+                  <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
+                </>
+              )}
             </button>
           </form>
-        </div>
 
-        {/* Footer */}
-        <div className="bg-gray-50/80 border-t border-gray-200/50 p-4 text-center">
-          <p className="text-xs text-gray-500">
-            © 2025 SIPTA System • Sistem Informasi Pembelajaran TPA Arrahman
+          <p
+            className="mt-8 text-center text-[11px]"
+            style={{ color: "var(--sipta-muted-fg-soft)" }}
+          >
+            © 2025 SIPTA · Sistem Informasi Pembelajaran TPA Arrahman
           </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

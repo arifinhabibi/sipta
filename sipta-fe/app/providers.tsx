@@ -1,22 +1,26 @@
 // app/providers.tsx
 "use client";
 
-import { useEffect } from "react";
 import { HeroUIProvider } from "@heroui/react";
-import { useAuthStore } from "@/src/state/AuthStore";
+import { useEffect } from "react";
 import { setupAuthInterceptor } from "@/src/infrastructure/SetupInterceptor";
+import { useAuthStore } from "@/src/state/AuthStore";
+import { ThemeProvider } from "./components/ThemeProvider";
 
+/**
+ * Bootstraps auth (Zustand persistence) then wires the axios interceptor once
+ * initialization has completed. This ordering is business-critical — see
+ * docs/frontend-architecture/10-authentication-and-authorization.md.
+ */
 function AuthInitializer({ children }: { children: React.ReactNode }) {
   const { initializeAuth, isInitialized } = useAuthStore();
 
   useEffect(() => {
-    // console.log("🔐 Initializing auth state...");
     initializeAuth();
   }, [initializeAuth]);
 
   useEffect(() => {
     if (isInitialized) {
-      // console.log("🔄 Setting up auth interceptors...");
       setupAuthInterceptor();
     }
   }, [isInitialized]);
@@ -26,8 +30,10 @@ function AuthInitializer({ children }: { children: React.ReactNode }) {
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <HeroUIProvider>
-      <AuthInitializer>{children}</AuthInitializer>
-    </HeroUIProvider>
+    <ThemeProvider>
+      <HeroUIProvider>
+        <AuthInitializer>{children}</AuthInitializer>
+      </HeroUIProvider>
+    </ThemeProvider>
   );
 }
