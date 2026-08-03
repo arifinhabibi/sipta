@@ -1,0 +1,162 @@
+{
+  "framework": {
+    "name": "Next.js",
+    "version": "15.5.4",
+    "router": "App Router",
+    "typescript": true,
+    "reactVersion": "19.1.0",
+    "clientRenderingProfile": "client-heavy"
+  },
+  "styling": {
+    "system": ["Tailwind CSS 4", "global CSS", "component-local utility classes"],
+    "componentLibraries": ["HeroUI 2.8.5", "Heroicons 2.2.0"],
+    "themeFiles": ["app/globals.css", "app/providers.tsx", "postcss.config.mjs"],
+    "semanticTokenCoverage": "minimal",
+    "darkModeSwitcher": false
+  },
+  "routes": [
+    {"path": "/", "file": "app/page.tsx", "access": "authenticated", "feature": "dashboard"},
+    {"path": "/auth/login", "file": "app/auth/login/page.tsx", "access": "public", "feature": "authentication"},
+    {"path": "/403", "file": "app/403/page.tsx", "access": "public", "feature": "forbidden"},
+    {"path": "/teachers", "file": "app/teachers/page.tsx", "access": "protected with client role checks", "feature": "teachers"},
+    {"path": "/classroom", "file": "app/classroom/page.tsx", "access": "protected with client role checks", "feature": "classrooms and students"},
+    {"path": "/classroom/student/[student_id]", "file": "app/classroom/student/[student_id]/page.tsx", "access": "no page-level ProtectedRoute import", "feature": "legacy student detail"},
+    {"path": "/classroom/schedule/[schedule_id]", "file": "app/classroom/schedule/[schedule_id]/page.tsx", "access": "authenticated", "feature": "student attendance"},
+    {"path": "/classroom/history/[schedule_id]", "file": "app/classroom/history/[schedule_id]/page.tsx", "access": "authenticated", "feature": "schedule history"},
+    {"path": "/schedules", "file": "app/schedules/page.tsx", "access": "protected with client role checks", "feature": "schedule and subject management"},
+    {"path": "/reports", "file": "app/reports/page.tsx", "access": "protected with client role checks", "feature": "teacher and student reports"},
+    {"path": "/reports/students/[student_id]", "file": "app/reports/students/[student_id]/page.tsx", "access": "authenticated", "feature": "student report"},
+    {"path": "/profile", "file": "app/profile/page.tsx", "access": "authenticated", "feature": "profile and instance settings"}
+  ],
+  "layouts": [
+    {"name": "root", "file": "app/layout.tsx", "providers": ["Providers", "Toaster"]}
+  ],
+  "features": [
+    "authentication and role protection",
+    "dashboard and daily schedules",
+    "teacher management",
+    "classroom, student, and placement management",
+    "academic-year transition and promotion",
+    "schedule and subject management",
+    "teacher and student attendance",
+    "accomplishments and assessments",
+    "teacher and student reports",
+    "profile and instance settings"
+  ],
+  "components": [
+    {"name": "ProtectedRoute", "file": "app/components/ProtectedRoute.tsx", "category": "security/navigation", "risk": "critical"},
+    {"name": "HeaderComponent", "file": "app/components/HeaderComponent.tsx", "category": "layout/navigation", "risk": "high"},
+    {"name": "StudentTab", "file": "app/components/reports/students/StudentTab.tsx", "category": "feature", "risk": "critical"},
+    {"name": "StudentDetailModal", "file": "app/components/reports/students/StudentDetailModal.tsx", "category": "feature/dialog", "risk": "critical"},
+    {"name": "UpgradeStudentModal", "file": "app/components/classrooms/UpgradeStudentModal.tsx", "category": "business workflow/dialog", "risk": "critical"},
+    {"name": "AbsensiModal", "file": "app/components/dashboard/AbsensiModal.tsx", "category": "attendance/browser integration", "risk": "critical"},
+    {"name": "TeacherModal", "file": "app/components/teachers/TeacherModal.tsx", "category": "form/dialog", "risk": "high"},
+    {"name": "StudentModal", "file": "app/components/classrooms/StudentModal.tsx", "category": "form/dialog", "risk": "high"},
+    {"name": "ClassroomModal", "file": "app/components/classrooms/ClassroomModal.tsx", "category": "form/dialog", "risk": "medium"},
+    {"name": "ScheduleModal", "file": "app/components/schedules/ScheduleModal.tsx", "category": "form/dialog", "risk": "high"}
+  ],
+  "stateManagement": [
+    {"library": "Zustand", "file": "src/state/AuthStore.ts", "domain": "authentication", "persisted": true, "storageKey": "auth-storage"},
+    {"library": "Zustand", "file": "src/state/AcademicYearStore.ts", "domain": "academic years", "persisted": false},
+    {"library": "Zustand", "file": "src/state/ClassroomStore.ts", "domain": "classrooms and students", "persisted": false},
+    {"library": "Zustand", "file": "src/state/ScheduleStore.ts", "domain": "schedules and attendance", "persisted": false},
+    {"library": "Zustand", "file": "src/state/StudyStore.ts", "domain": "subjects", "persisted": false},
+    {"library": "Zustand", "file": "src/state/TeacherStore.ts", "domain": "teachers", "persisted": false},
+    {"library": "Zustand", "file": "src/state/ReportStore.ts", "domain": "reports", "persisted": false},
+    {"library": "localStorage", "file": "app/classroom/schedule/[schedule_id]/page.tsx", "domain": "attendance draft", "persisted": true, "storageKeyPattern": "draft-{schedule_id}"}
+  ],
+  "apiClients": [
+    {"name": "apiClient", "file": "src/infrastructure/Instance.ts", "transport": "Axios", "auth": "Bearer and credentials"},
+    {"name": "interceptors", "file": "src/infrastructure/SetupInterceptor.ts", "responsibility": "auth header, transient retry, 401 refresh"},
+    {"name": "AuthApi", "file": "src/infrastructure/AuthApi.ts"},
+    {"name": "AcademicYearApi", "file": "src/infrastructure/AcademicYearApi.ts"},
+    {"name": "ClassroomApi", "file": "src/infrastructure/ClassroomApi.ts"},
+    {"name": "TeacherApi", "file": "src/infrastructure/TeacherApi.ts"},
+    {"name": "ScheduleApi", "file": "src/infrastructure/ScheduleApi.ts"},
+    {"name": "StudyApi", "file": "src/infrastructure/StudyApi.ts"},
+    {"name": "ReportApi", "file": "src/infrastructure/ReportApi.ts", "contractStatus": "legacy and canonical methods coexist"}
+  ],
+  "authentication": {
+    "strategy": "backend-issued bearer and refresh tokens",
+    "store": "src/state/AuthStore.ts",
+    "persistence": "Zustand localStorage",
+    "protection": "app/components/ProtectedRoute.tsx",
+    "middleware": false,
+    "loginRoute": "/auth/login",
+    "forbiddenRoute": "/403",
+    "securityReviewRequired": true
+  },
+  "forms": [
+    {"name": "login", "file": "app/auth/login/page.tsx", "library": "react-hook-form", "schemaLibrary": null},
+    {"name": "teacher", "file": "app/components/teachers/TeacherModal.tsx", "library": "controlled local state", "multipart": true},
+    {"name": "student", "file": "app/components/classrooms/StudentModal.tsx", "library": "controlled local state", "multipart": true},
+    {"name": "classroom", "file": "app/components/classrooms/ClassroomModal.tsx", "library": "controlled local state"},
+    {"name": "promotion", "file": "app/components/classrooms/UpgradeStudentModal.tsx", "library": "controlled local state", "businessCritical": true},
+    {"name": "schedule", "file": "app/components/schedules/ScheduleModal.tsx", "library": "controlled local state"},
+    {"name": "teacher attendance", "file": "app/components/dashboard/AbsensiModal.tsx", "library": "controlled local state", "multipart": true, "businessCritical": true}
+  ],
+  "externalIntegrations": [
+    "HeroUI",
+    "Heroicons",
+    "React Hot Toast",
+    "Leaflet and React Leaflet",
+    "browser geolocation",
+    "React Webcam",
+    "React Big Calendar",
+    "Moment"
+  ],
+  "environmentVariables": [
+    {"name": "NEXT_PUBLIC_API_BASE_URL", "purpose": "backend API base URL", "scope": "client", "sensitive": false},
+    {"name": "NEXT_PUBLIC_ASSET", "purpose": "asset base URL", "scope": "client", "sensitive": false}
+  ],
+  "highRiskFiles": [
+    "src/infrastructure/Instance.ts",
+    "src/infrastructure/SetupInterceptor.ts",
+    "src/infrastructure/ReportApi.ts",
+    "src/state/AuthStore.ts",
+    "src/state/AcademicYearStore.ts",
+    "app/providers.tsx",
+    "app/components/ProtectedRoute.tsx",
+    "app/components/classrooms/UpgradeStudentModal.tsx",
+    "app/components/dashboard/AbsensiModal.tsx",
+    "app/classroom/schedule/[schedule_id]/page.tsx",
+    "app/components/reports/students/StudentTab.tsx",
+    "app/components/reports/students/StudentDetailModal.tsx"
+  ],
+  "safeRedesignAreas": [
+    "semantic visual tokens",
+    "typography and spacing",
+    "responsive presentation",
+    "cards and table presentation",
+    "loading, empty, error, and success visuals",
+    "navigation styling with preserved routes and role visibility",
+    "read-only historical report presentation"
+  ],
+  "protectedBehavior": [
+    "route and dynamic parameter names",
+    "API methods, payload keys, response fields, multipart and blob behavior",
+    "auth-storage session persistence and refresh lifecycle",
+    "role checks and redirects",
+    "draft-{schedule_id} attendance recovery",
+    "academic-year close, rollover, and transition",
+    "student placement and promotion",
+    "attendance camera and geolocation payloads",
+    "active assessment editing and closed-term read-only reports"
+  ],
+  "knownIssues": [
+    "no automated test suite",
+    "legacy misspelled and canonical report endpoints coexist",
+    "student report UI has no semester selector",
+    "report page contains mock/random schedule content",
+    "several report generator API methods are empty",
+    "StudyApi academic_year_id parameters are not sent",
+    "large client components mix presentation and business behavior",
+    "many API and store values use any",
+    "no route-level loading or error boundaries",
+    "client-only route protection and browser-readable tokens",
+    "Dockerfile starts the development server"
+  ],
+  "recommendedFeatureSpecs": [
+    {"name": "student report by semester", "file": "docs/frontend-architecture/21-semester-student-report.md", "status": "documented, not implemented"}
+  ]
+}

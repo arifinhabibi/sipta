@@ -1,0 +1,12 @@
+Raudhathul Athfal 1 = ef732e52-c94d-48aa-a5e3-46cd0518ad59
+Raudhathul Athfal 2 = 8c17f659-aacd-48d7-a1fd-3d9dcaf6354e
+Raudhathul Athfal 3 = cb23313a-3ad9-431f-846b-70c7a3bc0a2f
+Awaliyah Sore = 3651875e-97c5-440f-8b15-b37fa9b05e2b
+Awaliyah ikhwan = 7c2d472c-ba6a-4390-9d63-407eb7478aac
+Awaliyah akhwat = d3ecd3e0-102d-4780-98b5-cf5bfff43d6d
+Wustho Sore = e7e4fead-2a58-46e9-92ab-a0f158e7b5b6
+Wustho ikhwan = 6265f095-28f4-4c4d-b8e2-60f3cef0cf83
+Wustho akhwat = 198baea3-c3db-4dc8-b3e5-404581fe9fe0
+Ulya Sore = 6531bf9f-6fb6-470c-af84-e8762b463daa
+Ulya ikhwan = ec7489f6-f262-43d8-be61-d42f9e71579e
+Ulya akhwat = a5547412-74fb-4267-babc-e887599047d3

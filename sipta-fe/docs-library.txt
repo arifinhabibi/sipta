@@ -1,0 +1,7 @@
+supabase_pass=LskEtKZH9uSjFwCR
+
+webcam=https://github.com/mozmorris/react-webcam
+geolocation=https://github.com/no23reason/react-geolocated
+form validation=https://react-hook-form.com/
+UI Components=https://www.heroui.com/
+message handling=https://react-hot-toast.com/

@@ -1,0 +1,113 @@
+@import "tailwindcss";
+@plugin './hero.ts';
+/* Note: You may need to change the path to fit your project structure */
+@source '../../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}';
+@custom-variant dark (&:is(.dark *));
+@import "leaflet/dist/leaflet.css";
+@import "react-big-calendar/lib/css/react-big-calendar.css";
+
+/* Tambahkan di globals.css atau dengan tailwind config */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes border-pulse {
+  0%,
+  100% {
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-border-pulse {
+  animation: border-pulse 2s ease-in-out infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-in;
+}
+
+@theme {
+  --color-primary: #1e40af;
+  --color-secondary: #9333ea;
+}
+
+/* styles/globals.css atau styles/calendar.css */
+
+/* Mobile Responsive Calendar */
+@media (max-width: 768px) {
+  .rbc-calendar {
+    font-size: 8pt !important;
+  }
+
+  .rbc-month-view {
+    font-size: 8pt !important;
+  }
+
+  .rbc-date-cell {
+    font-size: 7pt !important;
+    padding: 1px 2px !important;
+  }
+
+  .rbc-event {
+    font-size: 6pt !important;
+    min-height: 14px !important;
+    padding: 0px 1px !important;
+    line-height: 1.1 !important;
+  }
+
+  .rbc-header {
+    font-size: 7pt !important;
+    padding: 4px 1px !important;
+  }
+
+  .rbc-toolbar {
+    font-size: 8pt !important;
+  }
+
+  .rbc-toolbar button {
+    font-size: 8pt !important;
+    padding: 4px 6px !important;
+  }
+}
+
+/* Tambahkan di file global.css atau style.css */
+@media (max-width: 640px) {
+  .month-navigation-compact {
+    padding: 0.5rem;
+  }
+  
+  .month-navigation-compact button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  .month-name {
+    font-size: 0.875rem;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
