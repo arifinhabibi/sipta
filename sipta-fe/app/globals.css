@@ -585,3 +585,46 @@ h1, h2, h3 {
 
 /* Ensure images/logos on primary gradients keep contrast */
 .on-primary { color: var(--sipta-primary-fg); }
+
+/* ------------------------------------------------------------------ */
+/*  DARK-MODE COMPAT LAYER                                             */
+/*  Bridges legacy hardcoded utility classes to dark-mode-adapted      */
+/*  surfaces WITHOUT touching each of the ~80 legacy TSX files.        */
+/*  Uses low-specificity selectors so any component-scoped explicit    */
+/*  color always wins.                                                 */
+/* ------------------------------------------------------------------ */
+.dark {
+  /* `bg-white` and `bg-white/*` legacy cards adopt the surface layer. */
+  --tw-bg-white: var(--sipta-surface);
+}
+.dark .bg-white {
+  background-color: var(--sipta-surface);
+}
+/* Semi-transparent white overlays (glass panels) — remap to a translucent surface. */
+.dark .bg-white\/80,
+.dark .bg-white\/90,
+.dark .bg-white\/95 {
+  background-color: color-mix(in oklch, var(--sipta-surface) 88%, transparent);
+}
+.dark .bg-white\/50,
+.dark .bg-white\/60,
+.dark .bg-white\/70 {
+  background-color: color-mix(in oklch, var(--sipta-surface) 55%, transparent);
+}
+.dark .bg-white\/10,
+.dark .bg-white\/20,
+.dark .bg-white\/30,
+.dark .bg-white\/40 {
+  background-color: color-mix(in oklch, var(--sipta-surface) 30%, transparent);
+}
+/* Legacy text-black adapts to foreground. */
+.dark .text-black {
+  color: var(--sipta-foreground);
+}
+/* Legacy full-black backgrounds (rare) invert to canvas. */
+.dark .bg-black {
+  background-color: var(--sipta-background);
+}
+
+/* Auto-invert leaflet map tiles slightly for dark canvases. */
+.dark .leaflet-container { background: #14141b; }

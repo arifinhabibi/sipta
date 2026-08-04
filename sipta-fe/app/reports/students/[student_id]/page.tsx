@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 
 import {
     ArrowLeftIcon,
@@ -17,13 +17,17 @@ import {
     XMarkIcon,
     ArrowPathIcon,
     ExclamationTriangleIcon,
+    LockClosedIcon,
 } from "@heroicons/react/24/outline";
 
 import { useReportStore } from "@/src/state/ReportStore";
+import { useAcademicYearStore } from "@/src/state/AcademicYearStore";
 import getStifin from "@/src/stifin";
 import HeaderComponent from "@/app/components/HeaderComponent";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
+import SemesterSelector from "@/app/components/reports/students/SemesterSelector";
+import { Alert } from "@/app/components/ui";
 
 interface Props {
     params: {
@@ -192,12 +196,71 @@ const getGrade = (score: number): string => {
 export default function StudentDetailPage() {
     const params = useParams<{student_id: string}>();
     const router = useRouter();
-    const { performanceStudentsByStudent, updatePerformanceStudent, exportPerformanceStudentPDF } = useReportStore();
+    const searchParams = useSearchParams();
+    const { performanceStudentsByStudent, updatePerformanceStudent, exportPerformanceStudentPDF, canonicalPerformanceStudent } = useReportStore();
+    const { academicYears, fetchAcademicYears, loading: yearsLoading } = useAcademicYearStore();
     const studentId = params.student_id;
 
     const [student, setStudent] = useState<StudentData | null>(null);
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState(false);
+
+    // ---------- Semester selection (URL-driven, no active-term mutation) ----------
+    // Docs reference: docs/frontend-architecture/21-semester-student-report.md
+    const urlYearId = searchParams?.get("academic_year_id") || undefined;
+    const activeYear = useMemo(() => academicYears.find((y) => y.is_active), [academicYears]);
+    const newestYear = useMemo(() => {
+        if (academicYears.length === 0) return undefined;
+        return [...academicYears].sort(
+            (a, b) => new Date(b.start_periode).getTime() - new Date(a.start_periode).getTime(),
+        )[0];
+    }, [academicYears]);
+
+    // Resolve selection according to the spec:
+    //  1. URL param wins if it matches an available term.
+    //  2. Otherwise fall back to the active term.
+    //  3. Otherwise newest term (labelled accurately in the UI).
+    const selectedYear = useMemo(() => {
+        if (!academicYears.length) return undefined;
+        if (urlYearId) {
+            const match = academicYears.find((y) => y.id === urlYearId);
+            if (match) return match;
+        }
+        return activeYear ?? newestYear;
+    }, [urlYearId, academicYears, activeYear, newestYear]);
+
+    // Race-safe latest request tracker: fast-switching users cannot see a
+    // stale response overwrite the current selection.
+    const requestSeqRef = useRef(0);
+    const [reportError, setReportError] = useState<string | null>(null);
+
+    // If URL param is missing or invalid, back-fill it after we know the selection.
+    useEffect(() => {
+        if (!academicYears.length || !selectedYear || !studentId) return;
+        if (urlYearId === selectedYear.id) return;
+        // Use `replace` to avoid polluting history when we're just canonicalizing.
+        const q = new URLSearchParams(searchParams?.toString() || "");
+        q.set("academic_year_id", selectedYear.id);
+        router.replace(`/reports/students/${studentId}?${q.toString()}`);
+    }, [academicYears.length, selectedYear?.id, urlYearId, studentId, router, searchParams]);
+
+    // Selector handler — writes to the URL (does not mutate active term).
+    const handleSelectYear = useCallback(
+        (id: string) => {
+            if (!studentId) return;
+            const q = new URLSearchParams(searchParams?.toString() || "");
+            q.set("academic_year_id", id);
+            router.push(`/reports/students/${studentId}?${q.toString()}`);
+        },
+        [router, searchParams, studentId],
+    );
+
+    const isHistorical = Boolean(selectedYear && !selectedYear.is_active);
+    const isClosed = selectedYear?.status === "closed";
+    // Edit / PDF controls remain enabled only for the *active* selected term,
+    // matching the “active vs. historical behavior” contract in the docs.
+    const editingAllowed = Boolean(selectedYear?.is_active);
+    const pdfAllowed = editingAllowed; // legacy PDF endpoint has no semester arg → gate it too
     
     // State untuk edit
     const [editingScore, setEditingScore] = useState<EditingScoreState | null>(null);
@@ -206,26 +269,49 @@ export default function StudentDetailPage() {
     const [updateMessage, setUpdateMessage] = useState<UpdateMessage | null>(null);
     const [isUpdating, setIsUpdating] = useState(false);
 
+    // Fetch academic years once on mount so the selector is populated.
+    useEffect(() => {
+        if (academicYears.length === 0) {
+            fetchAcademicYears().catch(() => {
+                /* store surfaces its own error state */
+            });
+        }
+    }, [fetchAcademicYears, academicYears.length]);
+
     useEffect(() => {
         async function load() {
             try {
                 if (!studentId) return;
-                const response: any = await performanceStudentsByStudent(
-                    studentId
-                );
+                if (academicYears.length && !selectedYear) return; // waiting on selection resolution
+                const mySeq = ++requestSeqRef.current;
+                setLoading(true);
+                setReportError(null);
+                // Prefer the semester-aware canonical endpoint. When no year is
+                // selected yet (still loading years) we call it without the arg
+                // so the backend returns the active term — matching v1 behavior.
+                const response: any = selectedYear
+                    ? await canonicalPerformanceStudent(studentId, selectedYear.id)
+                    : await performanceStudentsByStudent(studentId);
 
-                const data = response.data;
-                // console.log("student data", data);
-                setStudent(data);
-            } catch (error) {
-                console.error(error);
+                if (mySeq !== requestSeqRef.current) return; // stale response — ignore
+                const data = response?.data;
+                setStudent(data ?? null);
+            } catch (error: any) {
+                if (requestSeqRef.current) {
+                    console.error(error);
+                    setReportError(
+                        error?.response?.data?.message ||
+                            "Gagal memuat laporan siswa untuk semester ini.",
+                    );
+                    setStudent(null);
+                }
             } finally {
                 setLoading(false);
             }
         }
 
         load();
-    }, [studentId]);
+    }, [studentId, selectedYear?.id, academicYears.length, canonicalPerformanceStudent, performanceStudentsByStudent]);
 
     // Reset editing state saat student berubah
     useEffect(() => {
@@ -334,6 +420,7 @@ export default function StudentDetailPage() {
     // Handler untuk edit click
     const handleEditClick = useCallback((accomplishment: AccomplishmentWithMetadata) => {
         if (isUpdating) return;
+        if (!editingAllowed) return; // read-only for historical semesters
 
         if (editingScore) {
             const confirmSwitch = window.confirm(
@@ -362,7 +449,7 @@ export default function StudentDetailPage() {
         setTempScore(accomplishment.score);
         setTempIsCapable(accomplishment.is_capable || false);
         setUpdateMessage(null);
-    }, [editingScore, isUpdating]);
+    }, [editingScore, isUpdating, editingAllowed]);
 
     // Handler untuk cancel edit
     const handleCancelEdit = useCallback(() => {
@@ -376,6 +463,7 @@ export default function StudentDetailPage() {
     // Handler untuk save score
     const handleScoreUpdate = useCallback(async () => {
         if (!editingScore || isUpdating) return;
+        if (!editingAllowed) return; // guard: read-only for historical semesters
 
         setUpdateMessage(null);
 
@@ -451,7 +539,7 @@ export default function StudentDetailPage() {
         } finally {
             setIsUpdating(false);
         }
-    }, [editingScore, tempScore, tempIsCapable, handleUpdateScore, isUpdating]);
+    }, [editingScore, tempScore, tempIsCapable, handleUpdateScore, isUpdating, editingAllowed]);
 
     // Cek apakah accomplishment sedang diedit
     const isEditing = useCallback((accomplishmentId: string, attendanceId: string) => {
@@ -462,6 +550,7 @@ export default function StudentDetailPage() {
     // Handler untuk download PDF
     const handleDownloadPDF = useCallback(async () => {
         if (!studentId || downloading) return;
+        if (!pdfAllowed) return; // legacy PDF endpoint has no semester arg — never export while historical
         
         setDownloading(true);
         try {
@@ -472,7 +561,7 @@ export default function StudentDetailPage() {
         } finally {
             setDownloading(false);
         }
-    }, [studentId, downloading, exportPerformanceStudentPDF]);
+    }, [studentId, downloading, pdfAllowed, exportPerformanceStudentPDF]);
 
     if (loading) {
         return (
@@ -487,17 +576,53 @@ export default function StudentDetailPage() {
 
     if (!student) {
         return (
-            <div className="min-h-screen flex items-center justify-center p-5">
-                <div className="bg-white rounded-3xl p-8 shadow-lg text-center">
-                    <p className="text-gray-600">Data laporan siswa tidak ditemukan.</p>
-                    <button
-                        onClick={() => router.back()}
-                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl"
-                    >
-                        Kembali
-                    </button>
+            <ProtectedRoute allowedRoles={["admin", "teacher"]}>
+                <div className="min-h-screen bg-[var(--sipta-background)] pb-8">
+                    <HeaderComponent />
+                    <main className="mx-auto max-w-5xl px-5 py-6 space-y-4">
+                        {/* Selector remains available so users can switch semesters */}
+                        <SemesterSelector
+                            academicYears={academicYears}
+                            selectedId={selectedYear?.id}
+                            onChange={handleSelectYear}
+                            loading={yearsLoading}
+                        />
+                        {reportError && (
+                            <Alert
+                                tone="destructive"
+                                title="Gagal memuat laporan"
+                                icon={<ExclamationTriangleIcon className="h-5 w-5" />}
+                                testId="semester-report-error"
+                            >
+                                {reportError}
+                            </Alert>
+                        )}
+                        <div
+                            className="rounded-xl border p-6 text-center"
+                            style={{
+                                background: "var(--sipta-surface)",
+                                borderColor: "var(--sipta-border)",
+                            }}
+                        >
+                            <p className="text-sm" style={{ color: "var(--sipta-muted-fg)" }}>
+                                Data laporan siswa tidak ditemukan untuk semester ini.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => router.back()}
+                                className="mt-4 rounded-lg px-4 py-2 text-sm font-semibold"
+                                style={{
+                                    background: "var(--sipta-primary)",
+                                    color: "var(--sipta-primary-fg)",
+                                }}
+                                data-testid="student-report-back-empty"
+                            >
+                                Kembali
+                            </button>
+                        </div>
+                    </main>
                 </div>
-            </div>
+            </ProtectedRoute>
         );
     }
 
@@ -515,14 +640,21 @@ export default function StudentDetailPage() {
                             <button
                                 onClick={() => router.back()}
                                 className="flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow hover:shadow-md transition"
+                                data-testid="student-report-back-button"
                             >
                                 <ArrowLeftIcon className="h-5 w-5" />
                                 Kembali
                             </button>
                             <button
                                 onClick={handleDownloadPDF}
-                                disabled={downloading}
+                                disabled={downloading || !pdfAllowed}
+                                title={
+                                    !pdfAllowed
+                                        ? "Ekspor PDF hanya tersedia untuk semester aktif"
+                                        : undefined
+                                }
                                 className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-full shadow hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                data-testid="student-report-download-button"
                             >
                                 {downloading ? (
                                     <ArrowPathIcon className="h-5 w-5 animate-spin" />
@@ -532,6 +664,54 @@ export default function StudentDetailPage() {
                                 {downloading ? 'Mengunduh...' : 'Download PDF'}
                             </button>
                         </div>
+
+                        {/* Semester selector — spec: 21-semester-student-report.md */}
+                        <div className="mb-4">
+                            <SemesterSelector
+                                academicYears={academicYears}
+                                selectedId={selectedYear?.id}
+                                onChange={handleSelectYear}
+                                loading={yearsLoading}
+                            />
+                        </div>
+
+                        {/* Historical / archive banner */}
+                        {isHistorical && (
+                            <div className="mb-4">
+                                <Alert
+                                    tone={isClosed ? "warning" : "info"}
+                                    title={isClosed ? "Arsip semester — hanya baca" : "Semester non-aktif"}
+                                    icon={<LockClosedIcon className="h-5 w-5" />}
+                                    testId="semester-archive-banner"
+                                >
+                                    Kontrol edit dan ekspor PDF dinonaktifkan untuk semester ini. Semester aktif operasional tidak berubah.
+                                </Alert>
+                            </div>
+                        )}
+
+                        {/* Report fetch error */}
+                        {reportError && !loading && (
+                            <div className="mb-4">
+                                <Alert
+                                    tone="destructive"
+                                    title="Gagal memuat laporan"
+                                    icon={<ExclamationTriangleIcon className="h-5 w-5" />}
+                                    action={
+                                        <button
+                                            type="button"
+                                            onClick={() => selectedYear && handleSelectYear(selectedYear.id)}
+                                            className="text-xs font-semibold underline underline-offset-2 text-[var(--sipta-destructive)]"
+                                            data-testid="semester-report-retry-button"
+                                        >
+                                            Coba lagi
+                                        </button>
+                                    }
+                                    testId="semester-report-error"
+                                >
+                                    {reportError}
+                                </Alert>
+                            </div>
+                        )}
 
                         {/* Update Message */}
                         {updateMessage && (
@@ -780,8 +960,10 @@ export default function StudentDetailPage() {
                                                                     type="button"
                                                                     onClick={() => handleEditClick(accomplishment)}
                                                                     className="p-1.5 text-gray-400 hover:text-orange-600 transition-colors hover:bg-orange-50 rounded-md"
-                                                                    title="Edit nilai"
-                                                                    disabled={isUpdating}
+                                                                    title={editingAllowed ? "Edit nilai" : "Semester non-aktif — hanya baca"}
+                                                                    disabled={isUpdating || !editingAllowed}
+                                                                    hidden={!editingAllowed}
+                                                                    data-testid="student-skill-edit-button"
                                                                 >
                                                                     <PencilIcon className="w-4 h-4" />
                                                                 </button>
@@ -936,8 +1118,10 @@ export default function StudentDetailPage() {
                                                                     type="button"
                                                                     onClick={() => handleEditClick(accomplishment)}
                                                                     className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors hover:bg-blue-50 rounded-md"
-                                                                    title="Edit status"
-                                                                    disabled={isUpdating}
+                                                                    title={editingAllowed ? "Edit status" : "Semester non-aktif — hanya baca"}
+                                                                    disabled={isUpdating || !editingAllowed}
+                                                                    hidden={!editingAllowed}
+                                                                    data-testid="student-knowledge-edit-button"
                                                                 >
                                                                     <PencilIcon className="w-4 h-4" />
                                                                 </button>

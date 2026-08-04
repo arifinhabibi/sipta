@@ -13,6 +13,12 @@ interface ReportStore {
   attendancesTeacher: (startDate: string, endDate: string) => Promise<void>;
   performanceStudents: (classroom_id: string) => Promise<void>;
   performanceStudentsByStudent: (student_id: string) => Promise<void>;
+  /**
+   * Read-only, semester-aware student report.
+   * When `academicYearId` is omitted the backend returns the active term.
+   * See docs/frontend-architecture/21-semester-student-report.md.
+   */
+  canonicalPerformanceStudent: (student_id: string, academicYearId?: string) => Promise<any>;
   exportAttendanceTeachers: (startDate: string, endDate: string) => Promise<void>;
   updatePerformanceStudent: (studentId: string, payload: any) => Promise<void>;
   exportPerformanceStudentPDF: (studentId: string) => Promise<void>;
@@ -136,6 +142,18 @@ export const useReportStore = create<ReportStore>((set, get) => ({
         } catch (error) {
           throw error;
         }
+  },
+  canonicalPerformanceStudent: async (student_id: string, academicYearId?: string) => {
+    // Semester-aware read. Uses the correctly-spelled canonical endpoint.
+    try {
+      const response: any = await reportApi.canonicalPerformanceStudent(student_id, academicYearId);
+      if (response.data?.success) {
+        return response.data;
+      }
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
   updatePerformanceStudent: async (studentId: string, payload: any) => {
       try {
