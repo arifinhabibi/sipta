@@ -4,6 +4,8 @@ import { useAcademicYearStore } from "@/src/state/AcademicYearStore";
 import { updateAcademicYearInLocalStorage } from "@/src/utils/LocalStorageAuth";
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import { formatDateDDMMYYYY } from "@/src/utils/date";
+import { useConfirmDialog } from "@/app/components/ui";
 
 interface AcademicYearSectionProps {
   onReloadAcademicYears?: () => Promise<void>;
@@ -40,6 +42,7 @@ const AcademicYearSection: React.FC<AcademicYearSectionProps> = ({
     string | null
   >(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { confirm, confirmationDialog } = useConfirmDialog();
 
   // Load academic years on component mount
   useEffect(() => {
@@ -164,9 +167,15 @@ const AcademicYearSection: React.FC<AcademicYearSectionProps> = ({
   };
 
   const handleDeleteAcademicYear = async (id: string) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus tahun akademik ini?")) {
-      return;
-    }
+    const academicYear = academicYears.find((year) => year.id === id);
+    const confirmed = await confirm({
+      title: "Hapus tahun akademik?",
+      description: `Tahun akademik ${academicYear?.name ?? "ini"} (${academicYear?.periode ?? "-"}) akan dihapus.`,
+      confirmLabel: "Ya, hapus",
+      tone: "destructive",
+      testId: "academic-year-delete-confirm",
+    });
+    if (!confirmed) return;
 
     try {
       await deleteAcademicYear(id);
@@ -462,13 +471,9 @@ const AcademicYearSection: React.FC<AcademicYearSectionProps> = ({
                   </div>
                   <p className="text-xs text-gray-500">
                     Periode:{" "}
-                    {new Date(academicYear.start_periode).toLocaleDateString(
-                      "id-ID"
-                    )}{" "}
+                    {formatDateDDMMYYYY(academicYear.start_periode)}{" "}
                     -{" "}
-                    {new Date(academicYear.end_periode).toLocaleDateString(
-                      "id-ID"
-                    )}
+                    {formatDateDDMMYYYY(academicYear.end_periode)}
                   </p>
                 </div>
 
@@ -545,6 +550,7 @@ const AcademicYearSection: React.FC<AcademicYearSectionProps> = ({
           ))
         )}
       </div>
+      {confirmationDialog}
     </div>
   );
 };

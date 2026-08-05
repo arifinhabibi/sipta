@@ -20,6 +20,7 @@ import {
 import toast from "react-hot-toast";
 import TeacherModal from "../components/teachers/TeacherModal";
 import DeleteConfirmationModal from "../components/teachers/DeleteConfirmationModal";
+import { formatDateDDMMYYYY } from "@/src/utils/date";
 import LoadingState from "../components/teachers/LoadingState";
 import CredentialModal from "../components/reports/teachers/CredentialModal";
 
@@ -245,11 +246,7 @@ function TeachersPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
+    return formatDateDDMMYYYY(dateString);
   };
 
   const formatGender = (gender: string) => {

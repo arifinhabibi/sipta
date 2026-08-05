@@ -7,7 +7,6 @@ import {
   CalendarIcon,
   ChevronDownIcon,
   ClipboardDocumentListIcon,
-  ExclamationTriangleIcon,
   HomeIcon,
   UserCircleIcon,
   UserGroupIcon,
@@ -19,6 +18,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useAuthStore } from "@/src/state/AuthStore";
+import { useConfirmDialog } from "./ui";
 import ThemeToggle from "./ThemeToggle";
 
 /* ------------------------------------------------------------------ */
@@ -76,8 +76,8 @@ const NAV_ITEMS: NavItem[] = [
 
 function HeaderComponent() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { confirm, confirmationDialog } = useConfirmDialog();
 
   const [user, setUser] = useState({
     fullname: "",
@@ -111,13 +111,20 @@ function HeaderComponent() {
     }
   }, []);
 
-  const handleLogoutClick = () => {
+  const handleLogoutClick = async () => {
     setIsProfileOpen(false);
-    setShowLogoutConfirm(true);
+    const confirmed = await confirm({
+      title: "Konfirmasi keluar",
+      description:
+        "Anda akan keluar dari sesi ini. Login kembali diperlukan untuk mengakses SIPTA.",
+      confirmLabel: "Ya, keluar",
+      tone: "destructive",
+      testId: "logout-confirm-dialog",
+    });
+    if (confirmed) handleConfirmLogout();
   };
 
   const handleConfirmLogout = () => {
-    setShowLogoutConfirm(false);
     try {
       const resp: any = logout();
       if (resp?.success !== false) {
@@ -131,7 +138,6 @@ function HeaderComponent() {
     }
   };
 
-  const handleCancelLogout = () => setShowLogoutConfirm(false);
   const isActiveRoute = (route: string) => pathname === route;
   const visibleNav = NAV_ITEMS.filter(
     (n) => !n.adminOnly || user.role === "admin",
@@ -488,88 +494,7 @@ function HeaderComponent() {
         )}
       </header>
 
-      {/* Logout confirmation */}
-      {showLogoutConfirm && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-          style={{
-            background:
-              "color-mix(in oklch, var(--sipta-foreground) 45%, transparent)",
-          }}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="logout-title"
-          data-testid="logout-confirm-dialog"
-        >
-          <div
-            className="w-full max-w-md overflow-hidden rounded-2xl animate-fade-in"
-            style={{
-              background: "var(--sipta-surface-elevated)",
-              border: "1px solid var(--sipta-border)",
-              boxShadow: "var(--shadow-xl)",
-            }}
-          >
-            <div className="p-6">
-              <div className="flex items-start gap-3">
-                <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                  style={{
-                    background: "var(--sipta-destructive-subtle)",
-                    color: "var(--sipta-destructive)",
-                  }}
-                  aria-hidden="true"
-                >
-                  <ExclamationTriangleIcon className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <h3
-                    id="logout-title"
-                    className="text-base font-semibold"
-                    style={{ color: "var(--sipta-foreground)" }}
-                  >
-                    Konfirmasi keluar
-                  </h3>
-                  <p
-                    className="mt-1.5 text-sm leading-relaxed"
-                    style={{ color: "var(--sipta-muted-fg)" }}
-                  >
-                    Anda akan keluar dari sesi ini. Login kembali diperlukan
-                    untuk mengakses SIPTA.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={handleCancelLogout}
-                  className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-                  style={{
-                    border: "1px solid var(--sipta-border)",
-                    color: "var(--sipta-foreground)",
-                    background: "var(--sipta-surface)",
-                  }}
-                  data-testid="logout-cancel-button"
-                >
-                  Batal
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmLogout}
-                  className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
-                  style={{
-                    background: "var(--sipta-destructive)",
-                    color: "var(--sipta-destructive-fg)",
-                  }}
-                  data-testid="logout-confirm-button"
-                >
-                  Ya, keluar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {confirmationDialog}
     </>
   );
 }

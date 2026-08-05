@@ -148,7 +148,7 @@ function ReportContent() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 pb-20">
         <HeaderComponent />
-        <main className="max-w-7xl mx-auto px-4 py-6">
+        <main className="mx-auto max-w-xl px-4 py-6">
           <div className="flex justify-center items-center h-64">
             <div className="flex flex-col items-center gap-3">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -163,9 +163,9 @@ function ReportContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 pb-20">
       <HeaderComponent />
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+      <main className="mx-auto max-w-xl px-3 py-4 sm:px-4 sm:py-6">
         {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+        <div className="mb-6 flex flex-col gap-4">
           <div className="flex items-center justify-between w-full relative">
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Data Laporan</h1>
@@ -218,7 +218,7 @@ function ReportPageLoading() {
     <ProtectedRoute allowedRoles={["teacher", "admin"]}>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 pb-20">
         <HeaderComponent />
-        <main className="max-w-7xl mx-auto px-4 py-6">
+        <main className="mx-auto max-w-xl px-4 py-6">
           <div className="flex justify-center items-center h-64">
             <div className="flex flex-col items-center gap-3">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>

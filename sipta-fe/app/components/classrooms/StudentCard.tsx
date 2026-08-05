@@ -5,6 +5,7 @@ import { PencilIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon, UserCircleIcon }
 import { Student } from '@/src/domain/StudentEntity';
 import getStifin from '@/src/stifin';
 import Image from 'next/image';
+import { formatDateDDMMYYYY } from '@/src/utils/date';
 
 interface StudentCardProps {
   student: Student;
@@ -144,7 +145,7 @@ const StudentCard: React.FC<StudentCardProps> = ({
             <div className="flex flex-wrap gap-2">
               <span>{student.birth_place}</span>
               <span>•</span>
-              <span>{new Date(student.birth_date).toLocaleDateString('id-ID')}</span>
+              <span>{formatDateDDMMYYYY(student.birth_date)}</span>
             </div>
             {stifin?.result !== undefined && (
               <div className="mt-2 flex items-center gap-2">

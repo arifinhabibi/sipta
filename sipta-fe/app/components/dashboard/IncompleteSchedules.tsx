@@ -24,6 +24,7 @@ import AccomplishmentModal from "./AccomplishModal";
 import toast from "react-hot-toast";
 import UpdateScheduleModal from "./UpdateScheduleModal";
 import { useAuthStore } from "@/src/state/AuthStore";
+import { formatDateDDMMYYYY } from "@/src/utils/date";
 
 const IncompleteSchedules: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -447,7 +448,7 @@ const IncompleteSchedules: React.FC = () => {
                       status.hasCheckIn ? "text-yellow-600 bg-yellow-50" :
                       "text-gray-500 bg-gray-50"
                     }`}>
-                      {schedule.date}
+                      {formatDateDDMMYYYY(schedule.date)}
                     </span>
                   </div>
 

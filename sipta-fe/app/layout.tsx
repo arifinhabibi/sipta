@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import {
   Bricolage_Grotesque,
   Geist,
@@ -42,6 +42,12 @@ export const metadata: Metadata = {
   title: "SIPTA — Sistem Informasi Pembelajaran TPA Arrahman",
   description:
     "Manajemen guru, kelas, jadwal, absensi, dan laporan performa siswa dalam satu antarmuka analitik modern.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 // No-FOUC theme bootstrap. Runs before React hydrates so the correct

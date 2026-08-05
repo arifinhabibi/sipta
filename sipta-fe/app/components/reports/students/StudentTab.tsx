@@ -18,11 +18,18 @@ import {
 } from '@heroicons/react/24/outline';
 import { useClassroomStore } from '@/src/state/ClassroomStore';
 import { useReportStore } from '@/src/state/ReportStore';
+import { useAcademicYearStore } from '@/src/state/AcademicYearStore';
 import { StudentDetailModal } from './StudentDetailModal';
-import { useRouter } from "next/navigation";
+import { SemesterSelector } from './SemesterSelector';
+import { useRouter, useSearchParams } from "next/navigation";
 
-const goToStudentDetail = (router: ReturnType<typeof useRouter>, studentId: string) => {
-  router.push(`/reports/students/${studentId}`);
+const goToStudentDetail = (
+  router: ReturnType<typeof useRouter>,
+  studentId: string,
+  academicYearId?: string,
+) => {
+  const query = academicYearId ? `?academic_year_id=${encodeURIComponent(academicYearId)}` : '';
+  router.push(`/reports/students/${studentId}${query}`);
 };
 
 // Types
@@ -112,6 +119,61 @@ export interface StudentTabData {
   summary: Summary;
   students: Student[];
 }
+
+const averageDomain = (subjects: any[], domain: keyof AverageScores): number => {
+  const values = subjects
+    .map((subject) => Number(subject?.domain_averages?.[domain]))
+    .filter((value) => Number.isFinite(value));
+  return values.length > 0
+    ? values.reduce((total, value) => total + value, 0) / values.length
+    : 0;
+};
+
+const normalizeCanonicalClassroomReport = (payload: any): StudentTabData => {
+  const sourceStudents = Array.isArray(payload?.students) ? payload.students : [];
+  const students: Student[] = sourceStudents.map((item: any, index: number) => {
+    const subjects = Array.isArray(item?.subjects) ? item.subjects : [];
+    const finalScore = Number(item?.final_score ?? item?.provisional_score ?? 0);
+
+    return {
+      id: item?.student?.id ?? '',
+      fullname: item?.student?.fullname ?? '-',
+      attendances: [],
+      summary: {
+        attendance_percentage: Number(item?.attendance?.percentage ?? 0),
+        final_score: Number.isFinite(finalScore) ? finalScore : 0,
+        average_scores: {
+          creativity1: averageDomain(subjects, 'creativity1'),
+          creativity2: averageDomain(subjects, 'creativity2'),
+          attitude: averageDomain(subjects, 'attitude'),
+          skill: averageDomain(subjects, 'skill'),
+        },
+        rank: Number(item?.rank ?? index + 1),
+      },
+    };
+  });
+  const first = sourceStudents[0];
+  const top = students[0];
+
+  return {
+    classroom: {
+      id: first?.classroom?.id ?? '',
+      name: first?.classroom?.name ?? '-',
+      teacher: first?.classroom?.teacher ?? { id: '', full_name: '-' },
+    },
+    academic_year: payload?.academic_year ?? { id: '', name: '-', periode: '-' },
+    summary: {
+      total_students: students.length,
+      average_final_score: students.length
+        ? students.reduce((total, student) => total + student.summary.final_score, 0) / students.length
+        : 0,
+      top_student: top
+        ? { id: top.id, fullname: top.fullname, final_score: top.summary.final_score }
+        : { id: '', fullname: '-', final_score: 0 },
+    },
+    students,
+  };
+};
 
 interface StudentTabProps {
   onGenerateStudentReport: (studentId: string) => void;
@@ -232,8 +294,10 @@ export const StudentTab: React.FC<StudentTabProps> = ({
 }) => {
   // Zustand stores
   const { classrooms, loading: classroomsLoading, fetchClassrooms } = useClassroomStore();
-  const { performanceStudents, updatePerformanceStudent, exportPerformanceStudentPDF } = useReportStore();
+  const { canonicalPerformanceStudents, updatePerformanceStudent, exportPerformanceStudentPDF } = useReportStore();
+  const { academicYears, loading: yearsLoading, fetchAcademicYears } = useAcademicYearStore();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Local states
   const [selectedClassroom, setSelectedClassroom] = useState<string>('');
@@ -249,8 +313,20 @@ export const StudentTab: React.FC<StudentTabProps> = ({
   const [isClassroomDropdownOpen, setIsClassroomDropdownOpen] = useState(false);
   const [attendanceFilter, setAttendanceFilter] = useState<string>('all');
   const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
+  const requestedAcademicYearId = searchParams.get('academic_year_id') ?? undefined;
+  const selectedAcademicYear = useMemo(() => {
+    return academicYears.find((year) => year.id === requestedAcademicYearId)
+      ?? academicYears.find((year) => year.is_active)
+      ?? academicYears[0];
+  }, [academicYears, requestedAcademicYearId]);
 
   // Effects
+  useEffect(() => {
+    if (academicYears.length === 0) {
+      fetchAcademicYears().catch(() => undefined);
+    }
+  }, [academicYears.length, fetchAcademicYears]);
+
   useEffect(() => {
     if (classrooms.length > 0 && !selectedClassroom) {
       setSelectedClassroom(classrooms[0].id);
@@ -258,21 +334,25 @@ export const StudentTab: React.FC<StudentTabProps> = ({
   }, [classrooms, selectedClassroom]);
 
   useEffect(() => {
-    if (selectedClassroom) {
-      loadStudentPerformance(selectedClassroom);
+    if (selectedClassroom && selectedAcademicYear) {
+      loadStudentPerformance(selectedClassroom, selectedAcademicYear.id);
     }
-  }, [selectedClassroom]);
+  }, [selectedClassroom, selectedAcademicYear?.id]);
 
   // Functions
-  const loadStudentPerformance = async (classroomId: string): Promise<StudentTabData | null> => {
+  const loadStudentPerformance = async (
+    classroomId: string,
+    academicYearId = selectedAcademicYear?.id,
+  ): Promise<StudentTabData | null> => {
     setLoading(true);
     setError(null);
     try {
-      const response: any = await performanceStudents(classroomId);
+      const response: any = await canonicalPerformanceStudents(classroomId, academicYearId);
       
       if (response.success) {
-        setStudentData(response.data);
-        return response.data;
+        const normalized = normalizeCanonicalClassroomReport(response.data);
+        setStudentData(normalized);
+        return normalized;
       } else {
         throw new Error(response.message || 'Gagal memuat data performa siswa');
       }
@@ -419,7 +499,7 @@ const handleDownloadStudentPDF = async (e: React.MouseEvent, studentId: string) 
     if (downloadingPdf === studentId) return;
     setDownloadingPdf(studentId);
     try {
-      await exportPerformanceStudentPDF(studentId);
+      await exportPerformanceStudentPDF(studentId, selectedAcademicYear?.id);
     } catch (error: any) {
       console.error('Error downloading PDF:', error);
     } finally {
@@ -431,10 +511,24 @@ const handleDownloadStudentPDF = async (e: React.MouseEvent, studentId: string) 
     setSearchQuery('');
   };
 
+  const handleAcademicYearChange = (academicYearId: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', 'students');
+    params.set('academic_year_id', academicYearId);
+    setStudentData(null);
+    resetFilters();
+    router.push(`/reports?${params.toString()}`, { scroll: false });
+  };
+
   const selectedClassroomObj = classrooms.find(c => c.id === selectedClassroom);
   return (
     <div className="space-y-6 pb-6">
-      
+      <SemesterSelector
+        academicYears={academicYears}
+        selectedId={selectedAcademicYear?.id}
+        onChange={handleAcademicYearChange}
+        loading={yearsLoading}
+      />
 
       {/* Main Card - All Controls in Header */}
       {!selectedClassroom && !classroomsLoading ? (
@@ -643,7 +737,7 @@ const handleDownloadStudentPDF = async (e: React.MouseEvent, studentId: string) 
       {/* View Toggle & Info */}
       <div className="flex items-center justify-between">
         {/* View Toggle */}
-        <div className="flex border rounded-lg overflow-hidden">
+        <div className="hidden border rounded-lg overflow-hidden">
           <button
             onClick={() => setViewMode('table')}
             disabled={!selectedClassroom || loading}
@@ -746,7 +840,7 @@ const handleDownloadStudentPDF = async (e: React.MouseEvent, studentId: string) 
               {filteredStudents.length > 0 ? (
                 <>
                   {/* Desktop Table View */}
-                  <div className="hidden md:block">
+                  <div className="hidden">
                     {viewMode === 'table' ? (
                       <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
@@ -814,7 +908,7 @@ const handleDownloadStudentPDF = async (e: React.MouseEvent, studentId: string) 
                                 onClick={() => handleSort('summary.average_scores.skill')}
                               >
                                 <div className="flex items-center gap-1">
-                                  Skill Rata-rata
+                                  Rata-rata Tugas
                                   {sortConfig.key === 'summary.average_scores.skill' && (
                                     <span className="text-gray-400">
                                       {sortConfig.direction === 'asc' ? '↑' : '↓'}
@@ -866,8 +960,8 @@ const handleDownloadStudentPDF = async (e: React.MouseEvent, studentId: string) 
                                   <ScoreBadge score={student.summary.average_scores.skill} />
                                 </td>
                                 <td className="px-4 py-4 whitespace-nowrap">
-                  <button
-                                    onClick={() => goToStudentDetail(router, student.id)}
+                                  <button
+                                    onClick={() => goToStudentDetail(router, student.id, selectedAcademicYear?.id)}
                                     className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 transition-colors"
                                   >
                                     Detail
@@ -939,10 +1033,7 @@ const handleDownloadStudentPDF = async (e: React.MouseEvent, studentId: string) 
                               </div>
 
                               <button
-                                onClick={() => {
-                                  setSelectedStudent(student);
-                                  setIsDetailModalOpen(true);
-                                }}
+                                onClick={() => goToStudentDetail(router, student.id, selectedAcademicYear?.id)}
                                 className="w-full mt-4 px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
                               >
                                 Detail
@@ -955,14 +1046,14 @@ const handleDownloadStudentPDF = async (e: React.MouseEvent, studentId: string) 
                   </div>
 
                   {/* Mobile List View */}
-                  <div className="md:hidden space-y-3">
+                  <div className="space-y-3">
                     {filteredStudents.map((student) => (
                       <div
                         key={student.id}
                         onClick={() => {
                           // setSelectedStudent(student);
                           // setIsDetailModalOpen(true);
-                          return router.push(`reports/students/${student.id}`);
+                          return goToStudentDetail(router, student.id, selectedAcademicYear?.id);
                         }}
                         className="bg-white rounded-xl border shadow-sm p-4 active:bg-gray-50 transition-colors cursor-pointer hover:shadow-md"
                       >

@@ -11,6 +11,7 @@ import { StatusChip, TypeChip } from "./ReuseComponent";
 import { formatDate } from "../TeacherAttendancePanel";
 import { useMemo } from "react";
 import { Modal, ModalBody, ModalFooter, ModalHeader } from "./Modal";
+import { formatDateTimeDDMMYYYY } from "@/src/utils/date";
 
 export const AttendanceDetailModal: React.FC<{
   attendance: Attendance | null;
@@ -94,7 +95,7 @@ export const AttendanceDetailModal: React.FC<{
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Jam Masuk:</span>
-                    <span className="font-medium text-gray-900">{new Date(attendance.created_at).toLocaleString('id-ID')}</span>
+                    <span className="font-medium text-gray-900">{formatDateTimeDDMMYYYY(attendance.created_at)}</span>
                   </div>
                 </div>
               </div>

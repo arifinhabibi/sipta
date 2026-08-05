@@ -2,12 +2,10 @@
 
 import { useMemo, useState, useCallback, useEffect } from "react";
 import {
-  DocumentArrowDownIcon,
   MagnifyingGlassIcon,
   UserGroupIcon,
   CalendarIcon,
   FunnelIcon,
-  ArrowTrendingUpIcon,
   ExclamationTriangleIcon,
   PrinterIcon,
   ChevronLeftIcon,
@@ -15,23 +13,20 @@ import {
 } from "@heroicons/react/24/outline";
 import { useAuthStore } from "@/src/state/AuthStore";
 import { useReportStore } from "@/src/state/ReportStore";
-import {
+import type {
   Attendance,
-  AttendanceResponse,
   AttendanceSummary,
   TeacherAttendancePanelProps,
   AcademicYear
 } from "@/src/domain/Attendance";
 import { EmptyState, LoadingState } from "./teachers/ReuseComponent";
 import { Button } from "./teachers/Button";
-import { SummaryCards } from "./teachers/SummaryCards";
 import { AttendanceList } from "./teachers/AttendanceList"; // Pastikan ini import yang benar
 import { AttendanceDetailModal } from "./teachers/AttendanceDetailModal";
 import { DownloadModal } from "./teachers/DownloadModal";
 import { MobileFilterDrawer } from "./teachers/MobileFilterDrawer";
-import { PrintMonthlyModal } from "./teachers/PrintMonthlyModal";
-import { apiClient } from "@/src/infrastructure/Instance";
 import { DateRangeModal } from "./teachers/DateRangeModal";
+import { TeacherAttendanceAnalytics } from "./teachers/TeacherAttendanceAnalytics";
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -39,16 +34,9 @@ import { DateRangeModal } from "./teachers/DateRangeModal";
 
 export const formatDate = (
   dateString: string,
-  options: Intl.DateTimeFormatOptions = {}
 ) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("id-ID", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    ...options,
-  });
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateString);
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : "Tanggal tidak valid";
 };
 
 export const formatDateToYYYYMMDD = (date: Date): string => {
@@ -134,7 +122,7 @@ interface AttendanceData {
 // =============================================================================
 
 const useAttendanceData = (startDate: string, endDate: string) => {
-  const { attendancesTeacher, exportAttendanceTeachers } = useReportStore();
+  const { attendancesTeacher } = useReportStore();
   const [data, setData] = useState<AttendanceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -162,9 +150,7 @@ const useAttendanceData = (startDate: string, endDate: string) => {
 // MAIN COMPONENT - MODIFIED VERSION
 // =============================================================================
 
-export const TeacherAttendancePanel: React.FC<TeacherAttendancePanelProps> = ({
-  onRefresh,
-}) => {
+export const TeacherAttendancePanel: React.FC<TeacherAttendancePanelProps> = () => {
   const { user } = useAuthStore();
   const { exportAttendanceTeachers } = useReportStore();
   const { generateTeacherReport, loading: reportLoading } = useReportStore();
@@ -176,7 +162,6 @@ export const TeacherAttendancePanel: React.FC<TeacherAttendancePanelProps> = ({
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [isDateRangeModalOpen, setIsDateRangeModalOpen] = useState(false);
-  const [isPrintMonthlyModalOpen, setIsPrintMonthlyModalOpen] = useState(false);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   
   // State untuk date range - default bulan ini
@@ -265,12 +250,9 @@ export const TeacherAttendancePanel: React.FC<TeacherAttendancePanelProps> = ({
 
   const handleDateRangeChange = useCallback((start: string, end: string) => {
     setDateRange({ startDate: start, endDate: end });
-    // Update currentMonth jika range adalah bulan penuh
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    if (start === getFirstDayOfMonth(startDate) && end === getLastDayOfMonth(startDate)) {
-      setCurrentMonth(startDate);
-    }
+    // Navigation bulan berikutnya/selanjutnya selalu berangkat dari awal
+    // periode yang dipilih, termasuk ketika pengguna memilih custom range.
+    setCurrentMonth(new Date(`${start}T00:00:00`));
     setIsDateRangeModalOpen(false);
   }, []);
 
@@ -286,10 +268,16 @@ export const TeacherAttendancePanel: React.FC<TeacherAttendancePanelProps> = ({
     setTypeFilter(value);
   }, []);
 
+  const handleResetFilters = useCallback(() => {
+    setSearchQuery("");
+    setStatusFilter("all");
+    setTypeFilter("all");
+  }, []);
+
   const handleBulkDownload = useCallback(
     async (
-      type: "daily" | "monthly" | "custom",
-      customRange?: { start: string; end: string }
+      _type: "daily" | "monthly" | "custom",
+      _customRange?: { start: string; end: string }
     ) => {
       try {
         await generateTeacherReport();
@@ -346,12 +334,10 @@ export const TeacherAttendancePanel: React.FC<TeacherAttendancePanelProps> = ({
       console.warn('Response is not a blob:', response);
     }
     
-    setIsPrintMonthlyModalOpen(false);
     setIsExporting(false);
 
   } catch (error) {
     console.error('Error exporting attendance:', error);
-    setIsPrintMonthlyModalOpen(false);
     setIsExporting(false);
     // Tampilkan error message
     alert('Gagal mengekspor laporan. Silakan coba lagi.');
@@ -360,12 +346,9 @@ export const TeacherAttendancePanel: React.FC<TeacherAttendancePanelProps> = ({
 
   // Format date untuk display
   const formatDisplayDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateString);
+    if (!match) return "-";
+    return `${match[3]}-${match[2]}-${match[1]}`;
   };
 
   // Format nama bulan
@@ -395,21 +378,6 @@ export const TeacherAttendancePanel: React.FC<TeacherAttendancePanelProps> = ({
     refetch();
   }, [dateRange, refetch]);
 
-  // if (error && !attendanceData) {
-  //   return (
-  //     <EmptyState
-  //       title="Gagal memuat data"
-  //       description={`Terjadi kesalahan: ${error}. Silakan refresh halaman.`}
-  //       icon={ExclamationTriangleIcon}
-  //       action={
-  //         <Button onClick={handleRefresh} color="primary">
-  //           Coba Lagi
-  //         </Button>
-  //       }
-  //     />
-  //   );
-  // }
-
   if (isLoading && !attendanceData) {
     return <LoadingState />;
   }
@@ -417,24 +385,24 @@ export const TeacherAttendancePanel: React.FC<TeacherAttendancePanelProps> = ({
   if (!attendanceData) {
     return (
       <EmptyState
-        title="Data tidak tersedia"
-        description="Tidak dapat memuat data kehadiran. Silakan refresh halaman."
+        title={error ? "Gagal memuat laporan" : "Data tidak tersedia"}
+        description={error || "Tidak dapat memuat data kehadiran untuk periode ini."}
         icon={ExclamationTriangleIcon}
-        // action={
-        //   <Button onClick={handleRefresh} color="primary">
-        //     Refresh
-        //   </Button>
-        // }
+        action={
+          <Button onClick={refetch} color="primary">
+            Coba Lagi
+          </Button>
+        }
       />
     );
   }
 
   // console.log(attendanceData.attendances)
-  const { academic_year, summary, date_range } = attendanceData;
+  const { academic_year, date_range } = attendanceData;
 
   return (
     <div className="min-h-screen bg-gray-50 p-3 sm:p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="mx-auto max-w-xl space-y-6">
         {/* Header */}
         <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
           <div className="w-full">
@@ -474,7 +442,7 @@ export const TeacherAttendancePanel: React.FC<TeacherAttendancePanelProps> = ({
                   <div className="flex items-center gap-2">
                     <CalendarIcon className="w-4 h-4 text-gray-500 hidden sm:block" />
                     <span className="text-sm sm:text-base font-semibold text-gray-900 text-center">
-                      {formatMonthYear(currentMonth)}
+                      {isFullMonthRange ? formatMonthYear(currentMonth) : "Periode Kustom"}
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 text-center mt-1 hidden sm:block">
@@ -576,8 +544,23 @@ export const TeacherAttendancePanel: React.FC<TeacherAttendancePanelProps> = ({
           </div>
         </div>
 
-        {/* Summary Cards */}
-        {/* <SummaryCards summary={summary} /> */}
+        {error && (
+          <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-2">
+              <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 flex-none" />
+              <p>Data terakhir masih ditampilkan, tetapi pembaruan gagal: {error}</p>
+            </div>
+            <button
+              type="button"
+              onClick={refetch}
+              className="font-semibold text-amber-950 underline underline-offset-2"
+            >
+              Coba lagi
+            </button>
+          </div>
+        )}
+
+        <TeacherAttendanceAnalytics attendances={attendanceData.attendances ?? []} />
 
         {/* Main Content */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -585,10 +568,10 @@ export const TeacherAttendancePanel: React.FC<TeacherAttendancePanelProps> = ({
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 sm:p-6 border-b border-gray-200">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
-                {isAdmin ? "Data Kehadiran" : "Riwayat Kehadiran Saya"}
+                {isAdmin ? "Log Absensi Guru" : "Riwayat Absensi Saya"}
               </h2>
-              <p className="text-sm text-gray-500 mt-1 hidden sm:block">
-                Kelola dan pantau data kehadiran {isAdmin ? "guru" : "anda"}
+              <p className="text-sm text-gray-500 mt-1">
+                Menampilkan {filteredAttendances.length} dari {attendanceData.attendances.length} catatan
               </p>
             </div>
 
@@ -622,6 +605,7 @@ export const TeacherAttendancePanel: React.FC<TeacherAttendancePanelProps> = ({
                 >
                   <option value="all">Semua Status</option>
                   <option value="present">Hadir</option>
+                  <option value="late">Terlambat</option>
                   <option value="absent">Absen</option>
                   <option value="sick">Sakit</option>
                   <option value="permission">Izin</option>
@@ -638,17 +622,38 @@ export const TeacherAttendancePanel: React.FC<TeacherAttendancePanelProps> = ({
                   <option value="check_out">Check Out</option>
                 </select>
               </div>
+
+              <div className="flex items-center gap-2 sm:hidden">
+                <button
+                  type="button"
+                  onClick={() => setIsFilterDrawerOpen(true)}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700"
+                >
+                  <FunnelIcon className="h-4 w-4" />
+                  Filter
+                </button>
+                {(statusFilter !== "all" || typeFilter !== "all" || searchQuery) && (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="rounded-lg px-3 py-2 text-sm font-semibold text-blue-700"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Body - PERBAIKAN DI SINI */}
           <div className="p-4 sm:p-6">
             <AttendanceList
-              attendances={filteredAttendances}
+              attendances={attendanceData.attendances}
               searchQuery={searchQuery}
               statusFilter={statusFilter}
               typeFilter={typeFilter}
               onAttendanceClick={handleAttendanceClick}
+              onResetFilters={handleResetFilters}
             />
           </div>
         </div>
@@ -675,14 +680,6 @@ export const TeacherAttendancePanel: React.FC<TeacherAttendancePanelProps> = ({
           academicYear={academic_year.name}
           isLoading={reportLoading}
         />
-
-        {/* <PrintMonthlyModal
-          isOpen={isPrintMonthlyModalOpen}
-          onClose={() => setIsPrintMonthlyModalOpen(false)}
-          onPrint={handlePrintMonthly}
-          academicYear={academic_year}
-          isLoading={reportLoading}
-        /> */}
 
         <MobileFilterDrawer
           isOpen={isFilterDrawerOpen}

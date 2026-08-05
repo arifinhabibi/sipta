@@ -13,6 +13,7 @@ import AccountSetting from "../components/profiles/AccountSetting";
 import ProfileSection from "../components/profiles/ProfileSection";
 import { AcademicYear, EditData, PasswordData } from "./utils";
 import { useAcademicYearStore } from "@/src/state/AcademicYearStore";
+import { formatDateDDMMYYYY } from "@/src/utils/date";
 
 // Dynamically import komponen react-leaflet
 const MapContainer = dynamic(
@@ -150,13 +151,7 @@ function ProfilePage() {
 
   // Format tanggal lahir
   const formatBirthDate = (dateString: any) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
+    return formatDateDDMMYYYY(dateString);
   };
 
   // Format gender

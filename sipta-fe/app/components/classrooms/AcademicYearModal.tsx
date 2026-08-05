@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AcademicYear } from '@/src/domain/AcademicYearEntity';
 import { CalendarDaysIcon, CheckIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
+import { formatDateDDMMYYYY } from '@/src/utils/date';
 
 interface AcademicYearModalProps {
   isOpen: boolean;
@@ -30,11 +31,7 @@ const AcademicYearModal: React.FC<AcademicYearModalProps> = ({
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('id-ID', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
+    return formatDateDDMMYYYY(dateString);
   };
 
   return (

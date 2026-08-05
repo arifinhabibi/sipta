@@ -27,6 +27,7 @@ import { useTeacherStore } from "@/src/state/TeacherStore";
 import { SubjectManagement } from "../components/schedules/SubjectManagement";
 import { AuthState, AuthUser } from "@/src/domain/AuthEntity";
 import { DeleteConfirmationModal } from "../components/schedules/DeleteConfirmationModal";
+import { formatDateDDMMYYYY } from "@/src/utils/date";
 
 const localizer = momentLocalizer(moment);
 
@@ -414,7 +415,7 @@ export default function Page() {
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">
-                Semua Jadwal - {moment(selectedDate).format("dddd, DD MMMM YYYY")}
+                Semua Jadwal - {formatDateDDMMYYYY(selectedDate)}
               </h3>
               <p className="text-sm text-gray-600 mt-1">
                 {selectedDateEvents.length} jadwal pada hari ini

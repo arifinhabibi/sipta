@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { CalendarIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { formatDateDDMMYYYY } from "@/src/utils/date";
 
 interface DateRangeModalProps {
   isOpen: boolean;
@@ -54,13 +55,7 @@ export const DateRangeModal: React.FC<DateRangeModalProps> = ({
   if (!isOpen) return null;
 
   const formatDisplayDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
+    return formatDateDDMMYYYY(dateString);
   };
 
   return (

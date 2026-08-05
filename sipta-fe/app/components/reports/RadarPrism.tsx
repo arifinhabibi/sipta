@@ -8,6 +8,13 @@ interface RadarPrismProps {
 
 export const RadarPrism: React.FC<RadarPrismProps> = ({ values, size = 120 }) => {
   const axes = ["knowledge", "skill", "attitude", "creativity", "discipline"] as const;
+  const axisLabels: Record<(typeof axes)[number], string> = {
+    knowledge: "Pemahaman",
+    skill: "Tugas",
+    attitude: "Sikap",
+    creativity: "Kreativitas",
+    discipline: "Disiplin",
+  };
   const max = 100;
   const cx = size / 2;
   const cy = size / 2;
@@ -71,7 +78,7 @@ export const RadarPrism: React.FC<RadarPrismProps> = ({ values, size = 120 }) =>
               dy={4}
               className="hidden sm:block"
             >
-              {a.charAt(0).toUpperCase() + a.slice(1)}
+              {axisLabels[a]}
             </text>
           );
         })}

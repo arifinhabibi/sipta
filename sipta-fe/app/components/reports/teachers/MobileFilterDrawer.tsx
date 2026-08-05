@@ -21,10 +21,12 @@ export const MobileFilterDrawer: React.FC<{
     <div className="fixed inset-0 z-50 overflow-hidden">
       <div className="absolute inset-0 overflow-hidden">
         {/* Background overlay - transparan */}
-        <div 
+        <button
+          type="button"
+          aria-label="Tutup filter"
           className="absolute inset-0 bg-black bg-opacity-30 transition-opacity"
           onClick={onClose}
-        ></div>
+        />
 
         {/* Drawer panel */}
         <div className="absolute inset-x-0 bottom-0 max-w-full flex">
@@ -33,6 +35,7 @@ export const MobileFilterDrawer: React.FC<{
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold">Filter Data</h3>
               <button
+                type="button"
                 onClick={onClose}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
@@ -48,8 +51,9 @@ export const MobileFilterDrawer: React.FC<{
                   Status Kehadiran
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {['all', 'present', 'absent', 'sick', 'permission'].map((status) => (
+                  {['all', 'present', 'late', 'absent', 'sick', 'permission'].map((status) => (
                     <button
+                      type="button"
                       key={status}
                       onClick={() => onStatusFilterChange(status)}
                       className={`
@@ -74,6 +78,7 @@ export const MobileFilterDrawer: React.FC<{
                 <div className="grid grid-cols-2 gap-2">
                   {['all', 'check_in', 'check_out'].map((type) => (
                     <button
+                      type="button"
                       key={type}
                       onClick={() => onTypeFilterChange(type)}
                       className={`
@@ -93,6 +98,7 @@ export const MobileFilterDrawer: React.FC<{
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <button
+                  type="button"
                   onClick={() => {
                     onStatusFilterChange('all');
                     onTypeFilterChange('all');
@@ -102,6 +108,7 @@ export const MobileFilterDrawer: React.FC<{
                   Reset Filter
                 </button>
                 <button
+                  type="button"
                   onClick={onClose}
                   className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
                 >

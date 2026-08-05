@@ -14,6 +14,7 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { useScheduleStore } from '@/src/state/ScheduleStore';
+import { formatDateDDMMYYYY } from '@/src/utils/date';
 
 interface UpdateStatusModalProps {
   isOpen: boolean;
@@ -144,12 +145,7 @@ const UpdateStatusModal: React.FC<UpdateStatusModalProps> = ({
                 <div className="flex items-center gap-2">
                   <CalendarIcon className="h-4 w-4" />
                   <span>
-                    {new Date(schedule.date).toLocaleDateString('id-ID', {
-                      weekday: 'long',
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric'
-                    })}
+                    {formatDateDDMMYYYY(schedule.date)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">

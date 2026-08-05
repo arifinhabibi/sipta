@@ -13,6 +13,7 @@ interface ReportStore {
   attendancesTeacher: (startDate: string, endDate: string) => Promise<void>;
   performanceStudents: (classroom_id: string) => Promise<void>;
   performanceStudentsByStudent: (student_id: string) => Promise<void>;
+  canonicalPerformanceStudents: (classroom_id: string, academicYearId?: string) => Promise<any>;
   /**
    * Read-only, semester-aware student report.
    * When `academicYearId` is omitted the backend returns the active term.
@@ -21,7 +22,7 @@ interface ReportStore {
   canonicalPerformanceStudent: (student_id: string, academicYearId?: string) => Promise<any>;
   exportAttendanceTeachers: (startDate: string, endDate: string) => Promise<void>;
   updatePerformanceStudent: (studentId: string, payload: any) => Promise<void>;
-  exportPerformanceStudentPDF: (studentId: string) => Promise<void>;
+  exportPerformanceStudentPDF: (studentId: string, academicYearId?: string) => Promise<void>;
 }
 
 export const useReportStore = create<ReportStore>((set, get) => ({
@@ -143,6 +144,10 @@ export const useReportStore = create<ReportStore>((set, get) => ({
           throw error;
         }
   },
+  canonicalPerformanceStudents: async (classroom_id: string, academicYearId?: string) => {
+    const response: any = await reportApi.canonicalPerformanceStudents(classroom_id, academicYearId);
+    return response.data;
+  },
   canonicalPerformanceStudent: async (student_id: string, academicYearId?: string) => {
     // Semester-aware read. Uses the correctly-spelled canonical endpoint.
     try {
@@ -173,17 +178,17 @@ export const useReportStore = create<ReportStore>((set, get) => ({
           throw error;
         }
   },
-  exportPerformanceStudentPDF: async (studentId: string) => {
+  exportPerformanceStudentPDF: async (studentId: string, academicYearId?: string) => {
     set({ loading: true, error: null });
     try {
-      const response: any = await reportApi.exportPerformanceStudentPDF(studentId);
+      const response: any = await reportApi.exportPerformanceStudentPDF(studentId, academicYearId);
       
       // Create download link for PDF
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `laporan-performa-siswa-${studentId}.pdf`;
+      link.download = `laporan-performa-siswa-${studentId}-${academicYearId ?? 'aktif'}.pdf`;
       link.click();
       window.URL.revokeObjectURL(url);
       

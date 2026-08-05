@@ -8,6 +8,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useAuthStore } from "@/src/state/AuthStore";
+import { formatDateDDMMYYYY } from "@/src/utils/date";
 
 /**
  * Dashboard hero band. v2 redesign:
@@ -156,12 +157,7 @@ const DashboardHeader: React.FC = () => {
             <div className="flex items-center gap-1 text-[11px] opacity-85">
               <CalendarIcon className="h-3 w-3" aria-hidden="true" />
               <span>
-                {time.toLocaleDateString("id-ID", {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
+                {formatDateDDMMYYYY(time)}
               </span>
             </div>
           </div>

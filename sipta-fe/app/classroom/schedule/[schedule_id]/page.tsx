@@ -8,6 +8,7 @@ import { useScheduleStore } from "@/src/state/ScheduleStore";
 import toast from "react-hot-toast";
 import { Student } from "@/src/domain/StudentEntity";
 import ScheduleSkeleton from "@/app/components/schedules/ScheduleSkeleton";
+import { formatDateDDMMYYYY } from "@/src/utils/date";
 
 export default function Page() {
   const params = useParams<{ schedule_id: string }>();
@@ -335,7 +336,7 @@ export default function Page() {
                 <p className="font-medium text-gray-700">
                   {schedule?.teacher.full_name}
                 </p>
-                <p className="text-xs text-gray-400">{schedule?.date}</p>
+                <p className="text-xs text-gray-400">{formatDateDDMMYYYY(schedule?.date)}</p>
                 {schedule?.end_time && (
                   <p
                     className={`text-xs ${
@@ -381,8 +382,8 @@ export default function Page() {
                 </div>
               </div>
               <div className="mt-2 text-xs text-gray-600">
-                <p>• <strong>Knowledge</strong>: Checklist (Mampu/Tidak Mampu)</p>
-                <p>• <strong>Skill</strong>: Skor 0-100, ≥65 = Mampu, &lt;65 = Tidak Mampu</p>
+                <p>• <strong>Pemahaman</strong>: Checklist (Mampu/Tidak Mampu)</p>
+                <p>• <strong>Tugas</strong>: Skor 0-100, ≥65 = Mampu, &lt;65 = Tidak Mampu</p>
               </div>
             </div>
 
@@ -439,7 +440,7 @@ export default function Page() {
                                     <div
                                       className={`text-xs px-2 py-1 rounded border ${gradeColor}`}
                                     >
-                                      Rata-rata Skill: {total} ({grade})
+                                      Rata-rata Tugas: {total} ({grade})
                                     </div>
                                   )}
                               </div>
@@ -483,7 +484,7 @@ export default function Page() {
                                           {acc.name}
                                         </span>
                                         <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                          Knowledge
+                                          Pemahaman
                                         </span>
                                       </label>
 
@@ -531,7 +532,7 @@ export default function Page() {
                                           {acc.name}
                                         </span>
                                         <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                                          Skill
+                                          Tugas
                                         </span>
                                       </label>
 

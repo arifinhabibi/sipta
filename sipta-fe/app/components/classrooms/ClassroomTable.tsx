@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Classroom } from '@/src/domain/ClassroomEntity';
 import { Student } from '@/src/domain/StudentEntity';
+import { formatDateDDMMYYYY } from '@/src/utils/date';
 
 interface ClassroomTableProps {
   classrooms: Classroom[];
@@ -261,13 +262,13 @@ const ClassroomTable: React.FC<ClassroomTableProps> = ({
                                       {student.fullname}
                                     </div>
                                     <div className="text-xs text-gray-500 lg:hidden">
-                                      {student.birth_place}, {new Date(student.birth_date).toLocaleDateString('id-ID')}
+                                      {student.birth_place}, {formatDateDDMMYYYY(student.birth_date)}
                                     </div>
                                   </td>
                                   <td className="px-4 py-3 text-sm text-gray-900 hidden lg:table-cell">
                                     <div>{student.birth_place}</div>
                                     <div className="text-gray-500">
-                                      {new Date(student.birth_date).toLocaleDateString('id-ID')}
+                                      {formatDateDDMMYYYY(student.birth_date)}
                                     </div>
                                   </td>
                                   <td className="px-4 py-3 text-sm text-gray-900">

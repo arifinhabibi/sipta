@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useId } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import { cn } from "./cn";
+import { useEffect, useId } from "react";
 import { Button } from "./Button";
+import { cn } from "./cn";
 
 export interface ModalProps {
   open: boolean;
@@ -62,18 +62,27 @@ export function Modal({
   return (
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center p-4 animate-fade-in"
-      style={{ background: "color-mix(in oklch, var(--sipta-foreground) 45%, transparent)" }}
-      onClick={dismissable ? onClose : undefined}
-      aria-hidden="true"
+      style={{
+        background:
+          "color-mix(in oklch, var(--sipta-foreground) 45%, transparent)",
+      }}
     >
+      {dismissable && (
+        <button
+          type="button"
+          className="absolute inset-0 cursor-default"
+          onClick={onClose}
+          aria-label="Tutup dialog"
+          tabIndex={-1}
+        />
+      )}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         aria-describedby={description ? descId : undefined}
-        onClick={(e) => e.stopPropagation()}
         className={cn(
-          "relative w-full overflow-hidden rounded-2xl",
+          "relative z-10 w-full overflow-hidden rounded-2xl",
           sizeMap[size],
         )}
         style={{
@@ -97,7 +106,10 @@ export function Modal({
                 {title}
               </h2>
               {description && (
-                <p id={descId} className="mt-1 text-sm text-[var(--sipta-muted-fg)]">
+                <p
+                  id={descId}
+                  className="mt-1 text-sm text-[var(--sipta-muted-fg)]"
+                >
                   {description}
                 </p>
               )}

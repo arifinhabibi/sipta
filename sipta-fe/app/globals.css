@@ -361,6 +361,8 @@ html.dark {
 }
 
 body {
+  min-width: 320px;
+  overflow-x: hidden;
   background: var(--sipta-background);
   color: var(--sipta-foreground);
   font-family: var(--font-body-family);

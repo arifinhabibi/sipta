@@ -16,6 +16,7 @@ import {
 
 import { useReportStore } from "@/src/state/ReportStore";
 import getStifin from "@/src/stifin";
+import { formatDateDDMMYYYY } from "@/src/utils/date";
 
 interface Props {
     params: {
@@ -88,23 +89,7 @@ interface StudentData {
 }
 
 const formatDate = (date: string) => {
-    if (!date) return "-";
-    return new Date(date).toLocaleDateString("id-ID", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-    });
-};
-
-const formatDateTime = (date: string) => {
-    if (!date) return "-";
-    return new Date(date).toLocaleString("id-ID", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-    });
+    return formatDateDDMMYYYY(date);
 };
 
 const getStatusBadgeColor = (status: string) => {
@@ -300,15 +285,15 @@ export default function StudentDetailPage({ params }: Props) {
                         color="green"
                     />
                     <StatCard
-                        title="Skill"
+                        title="Tugas"
                         value={student.summary.average_scores.skill.toFixed(1)}
-                        subtitle={`${capableSkills.length} capable`}
+                        subtitle={`${capableSkills.length} mampu`}
                         color="purple"
                     />
                     <StatCard
-                        title="Knowledge"
+                        title="Pemahaman"
                         value={student.summary.average_scores.creativity1.toFixed(1)}
-                        subtitle={`${capableKnowledge.length} capable`}
+                        subtitle={`${capableKnowledge.length} mampu`}
                         color="orange"
                     />
                 </div>
@@ -330,21 +315,21 @@ export default function StudentDetailPage({ params }: Props) {
                     <div className="p-4 bg-orange-50 rounded-xl">
                         <div className="flex items-center gap-2">
                             <FireIcon className="h-6 text-orange-500" />
-                            <p className="text-sm text-gray-600">Skill</p>
+                            <p className="text-sm text-gray-600">Tugas</p>
                         </div>
                         <b className="text-xl">{skills.length}</b>
                         <p className="text-xs text-gray-500">
-                            {capableSkills.length} capable
+                            {capableSkills.length} mampu
                         </p>
                     </div>
                     <div className="p-4 bg-blue-50 rounded-xl">
                         <div className="flex items-center gap-2">
                             <LightBulbIcon className="h-6 text-blue-500" />
-                            <p className="text-sm text-gray-600">Knowledge</p>
+                            <p className="text-sm text-gray-600">Pemahaman</p>
                         </div>
                         <b className="text-xl">{knowledge.length}</b>
                         <p className="text-xs text-gray-500">
-                            {capableKnowledge.length} capable
+                            {capableKnowledge.length} mampu
                         </p>
                     </div>
                 </div>

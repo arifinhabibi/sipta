@@ -10,6 +10,7 @@ import { SubjectModal } from "./SubjectModal";
 import { toast } from "react-hot-toast";
 import { useStudyStore } from "@/src/state/StudyStore";
 import { Subject } from "@/src/domain/ScheduleEntity";
+import { useConfirmDialog } from "@/app/components/ui";
 
 interface SubjectManagementProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export const SubjectManagement: React.FC<SubjectManagementProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const { confirm, confirmationDialog } = useConfirmDialog();
 
   // Filter subjects berdasarkan pencarian
   const filteredSubjects = subjects.filter(
@@ -51,17 +53,20 @@ export const SubjectManagement: React.FC<SubjectManagementProps> = ({
   };
 
   const handleDelete = async (subject: Subject) => {
-    if (
-      confirm(
-        `Apakah Anda yakin ingin menghapus mata pelajaran "${subject.name}"?`
-      )
-    ) {
-      try {
-        await deleteSubject(subject.id);
-        toast.success("Mata pelajaran berhasil dihapus");
-      } catch (error) {
-        toast.error("Gagal menghapus mata pelajaran");
-      }
+    const confirmed = await confirm({
+      title: "Hapus mata pelajaran?",
+      description: `Mata pelajaran “${subject.name}” akan dihapus dan tindakan ini tidak dapat dibatalkan.`,
+      confirmLabel: "Ya, hapus",
+      tone: "destructive",
+      testId: "subject-delete-confirm",
+    });
+    if (!confirmed) return;
+
+    try {
+      await deleteSubject(subject.id);
+      toast.success("Mata pelajaran berhasil dihapus");
+    } catch (error) {
+      toast.error("Gagal menghapus mata pelajaran");
     }
   };
 
@@ -363,6 +368,7 @@ export const SubjectManagement: React.FC<SubjectManagementProps> = ({
         onSubmit={handleSubmit}
         loading={loading}
       />
+      {confirmationDialog}
     </div>
   );
 };

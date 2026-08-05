@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -11,7 +11,6 @@ import {
   XCircleIcon,
   ClockIcon
 } from '@heroicons/react/24/outline';
-import { AttendanceDetailModal } from './AttendanceDetailModal';
 
 // =============================================================================
 // TYPES
@@ -40,21 +39,9 @@ export interface Attendance {
 // HELPER FUNCTIONS
 // =============================================================================
 
-const formatDate = (dateString: string, options?: Intl.DateTimeFormatOptions): string => {
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return 'Tanggal tidak valid';
-    
-    const defaultOptions: Intl.DateTimeFormatOptions = {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    };
-    
-    return new Intl.DateTimeFormat('id-ID', options || defaultOptions).format(date);
-  } catch {
-    return 'Tanggal tidak valid';
-  }
+const formatDate = (dateString: string): string => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateString);
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : 'Tanggal tidak valid';
 };
 
 // =============================================================================
@@ -202,11 +189,10 @@ export const AttendanceList: React.FC<{
   statusFilter: string;
   typeFilter: string;
   onAttendanceClick: (attendance: Attendance) => void;
-}> = ({ attendances, searchQuery, statusFilter, typeFilter, onAttendanceClick }) => {
+  onResetFilters: () => void;
+}> = ({ attendances, searchQuery, statusFilter, typeFilter, onAttendanceClick, onResetFilters }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [selectedAttendance, setSelectedAttendance] = useState<Attendance | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const filteredAttendances = useMemo(() => {
     return attendances.filter(attendance => {
@@ -229,15 +215,12 @@ export const AttendanceList: React.FC<{
 
   const totalPages = Math.ceil(filteredAttendances.length / itemsPerPage);
 
-  const handleViewDetail = (attendance: Attendance) => {
-    setSelectedAttendance(attendance);
-    setIsModalOpen(true);
-    onAttendanceClick(attendance);
-  };
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, typeFilter, attendances.length]);
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedAttendance(null);
+  const handleViewDetail = (attendance: Attendance) => {
+    onAttendanceClick(attendance);
   };
 
   const getStatusBadgeColor = (status: Attendance['status']) => {
@@ -285,7 +268,7 @@ export const AttendanceList: React.FC<{
         description="Tidak ada catatan kehadiran yang sesuai dengan filter yang dipilih."
         icon={CalendarIcon}
         action={
-          <Button color="primary" variant="light">
+          <Button color="primary" variant="light" onClick={onResetFilters}>
             Reset Filter
           </Button>
         }
@@ -294,7 +277,6 @@ export const AttendanceList: React.FC<{
   }
 
   return (
-    <>
       <div className="space-y-4">
         {/* Info Summary */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -382,9 +364,11 @@ export const AttendanceList: React.FC<{
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
+                        type="button"
                         onClick={() => handleViewDetail(attendance)}
                         className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
                         title="Lihat detail"
+                        aria-label={`Lihat detail absensi ${attendance.teacher_name}`}
                       >
                         <EyeIcon className="w-5 h-5" />
                       </button>
@@ -402,9 +386,10 @@ export const AttendanceList: React.FC<{
             const isToday = attendance.schedule_date === new Date().toISOString().split('T')[0];
 
             return (
-              <div
+              <button
+                type="button"
                 key={attendance.id}
-                className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-all duration-200 cursor-pointer"
+                className="w-full bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-all duration-200 cursor-pointer text-left"
                 onClick={() => handleViewDetail(attendance)}
               >
                 <div className="flex items-start justify-between">
@@ -432,7 +417,7 @@ export const AttendanceList: React.FC<{
                         
                         <div className="flex items-center gap-2 flex-wrap text-xs">
                           <span className="text-gray-600 bg-gray-50 px-2 py-1 rounded">
-                            {formatDate(attendance.schedule_date, { weekday: 'short', day: 'numeric', month: 'short' })}
+                            {formatDate(attendance.schedule_date)}
                           </span>
                           <span className="text-gray-500 font-medium">{attendance.schedule_time}</span>
                         </div>
@@ -453,7 +438,7 @@ export const AttendanceList: React.FC<{
                     <EyeIcon className="w-5 h-5 text-blue-600" />
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -479,6 +464,7 @@ export const AttendanceList: React.FC<{
             
             <div className="flex items-center gap-1">
               <button
+                type="button"
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
                 className="p-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
@@ -500,6 +486,7 @@ export const AttendanceList: React.FC<{
 
                 return (
                   <button
+                    type="button"
                     key={pageNum}
                     onClick={() => setCurrentPage(pageNum)}
                     className={`px-3 py-1 rounded-lg text-sm font-medium ${
@@ -514,6 +501,7 @@ export const AttendanceList: React.FC<{
               })}
               
               <button
+                type="button"
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
                 className="p-2 rounded-lg border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
@@ -528,13 +516,5 @@ export const AttendanceList: React.FC<{
           </div>
         )}
       </div>
-
-      {/* Detail Modal */}
-      <AttendanceDetailModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        attendance={selectedAttendance}
-      />
-    </>
   );
 };

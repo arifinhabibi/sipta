@@ -54,8 +54,9 @@ export const reportApi = {
         responseType: 'blob'
       })
     },
-    exportPerformanceStudentPDF: async (studentId: string) => {
-        return await apiClient.get(`/reports/perfomance-students/student/${studentId}/export/pdf`, {
+    exportPerformanceStudentPDF: async (studentId: string, academicYearId?: string) => {
+        return await apiClient.get(`/reports/performance-students/student/${studentId}/export/pdf`, {
+            params: academicYearId ? { academic_year_id: academicYearId } : undefined,
             responseType: 'blob'
         })
     }

@@ -10,6 +10,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { formatDateDDMMYYYY } from "@/src/utils/date";
 
 interface ScheduleItem {
   id: string;
@@ -277,12 +278,7 @@ export const AddScheduleModal: React.FC<{
               </div>
               {selectedDate && (
                 <p className="text-sm text-gray-500 mt-1">
-                  {new Date(selectedDate).toLocaleDateString("id-ID", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
+                  {formatDateDDMMYYYY(selectedDate)}
                 </p>
               )}
             </div>

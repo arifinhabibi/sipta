@@ -3,6 +3,7 @@ import { ChevronDownIcon, ChevronUpIcon, DocumentArrowDownIcon, EyeIcon } from '
 import { RadarPrism } from './RadarPrism';
 import moment from 'moment';
 import { PrismAxes, Schedule, Student } from '@/src/domain/ReportEntity';
+import { formatDateTimeDDMMYYYY } from '@/src/utils/date';
 
 interface StudentPerformanceCardProps {
   student: Student;
@@ -34,6 +35,14 @@ export const StudentPerformanceCard: React.FC<StudentPerformanceCardProps> = Rea
 
   // Fungsi untuk toggle expand
   const toggleOpen = () => setOpen(!open);
+
+  const performanceLabels: Record<keyof PrismAxes, string> = {
+    knowledge: 'Pemahaman',
+    skill: 'Tugas',
+    attitude: 'Sikap',
+    creativity: 'Kreativitas',
+    discipline: 'Disiplin',
+  };
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -112,7 +121,9 @@ export const StudentPerformanceCard: React.FC<StudentPerformanceCardProps> = Rea
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {Object.entries(prism).map(([key, value]) => (
                 <div key={key} className="text-center p-3 bg-gray-50 rounded-lg border">
-                  <div className="text-sm font-medium text-gray-700 capitalize mb-1">{key}</div>
+                  <div className="text-sm font-medium text-gray-700 mb-1">
+                    {performanceLabels[key as keyof PrismAxes] ?? key}
+                  </div>
                   <div className="text-lg font-bold text-blue-600">{value}%</div>
                   {/* Progress Bar Sederhana */}
                   <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
@@ -148,7 +159,7 @@ export const StudentPerformanceCard: React.FC<StudentPerformanceCardProps> = Rea
                         {schedule.title}
                       </div>
                       <div className="text-sm text-gray-600 truncate">
-                        {moment(schedule.start).format('DD MMM YYYY • HH:mm')}
+                        {formatDateTimeDDMMYYYY(schedule.start)}
                       </div>
                     </div>
                     <div className={`text-xs px-3 py-1 rounded-full font-medium flex-shrink-0 ml-3 ${

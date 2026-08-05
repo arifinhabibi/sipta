@@ -1,5 +1,6 @@
 // components/profiles/SystemsInformation.tsx
 import React from "react";
+import { formatDateTimeDDMMYYYY } from "@/src/utils/date";
 
 interface SystemsInformationProps {
   profileData: any;
@@ -19,13 +20,7 @@ const SystemsInformation: React.FC<SystemsInformationProps> = ({
             Dibuat Pada
           </label>
           <p className="text-sm text-gray-900 bg-gray-50 rounded-lg px-4 py-3">
-            {new Date(profileData.created_at).toLocaleDateString("id-ID", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+            {formatDateTimeDDMMYYYY(profileData.created_at)}
           </p>
         </div>
         <div>
@@ -33,13 +28,7 @@ const SystemsInformation: React.FC<SystemsInformationProps> = ({
             Diperbarui Pada
           </label>
           <p className="text-sm text-gray-900 bg-gray-50 rounded-lg px-4 py-3">
-            {new Date(profileData.updated_at).toLocaleDateString("id-ID", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+            {formatDateTimeDDMMYYYY(profileData.updated_at)}
           </p>
         </div>
       </div>

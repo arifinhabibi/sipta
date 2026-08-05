@@ -17,6 +17,7 @@ import {
   DocumentTextIcon,
   ArrowLeftIcon,
 } from "@heroicons/react/24/outline";
+import { formatDateDDMMYYYY } from "@/src/utils/date";
 
 // Interfaces berdasarkan struktur data response API
 interface Subject {
@@ -385,12 +386,7 @@ export default function ClassReviewPage() {
                     <div className="flex items-center gap-2">
                       <CalendarIcon className="h-4 w-4" />
                       <span>
-                        {new Date(schedule.date).toLocaleDateString("id-ID", {
-                          weekday: "long",
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })}
+                        {formatDateDDMMYYYY(schedule.date)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -641,9 +637,9 @@ export default function ClassReviewPage() {
                           </p>
                           <p className="text-xs text-gray-500 capitalize">
                             {accomplishment.type === "knowledge"
-                              ? "Pengetahuan"
+                              ? "Pemahaman"
                               : accomplishment.type === "skill"
-                              ? "Keterampilan"
+                              ? "Tugas"
                               : accomplishment.type}
                           </p>
                         </div>

@@ -27,7 +27,7 @@ import HeaderComponent from "@/app/components/HeaderComponent";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import SemesterSelector from "@/app/components/reports/students/SemesterSelector";
-import { Alert } from "@/app/components/ui";
+import { Alert, useConfirmDialog } from "@/app/components/ui";
 
 interface Props {
     params: {
@@ -61,6 +61,7 @@ interface Attendance {
 }
 
 interface StudentData {
+    report_mode: "legacy" | "canonical";
     student: {
         id: string;
         fullname: string;
@@ -92,11 +93,28 @@ interface StudentData {
         average_scores: {
             creativity1: number;
             creativity2: number;
+            creativity: number;
             attitude: number;
             skill: number;
+            knowledge: number;
         };
     };
     attendances: Attendance[];
+    canonical_subjects: CanonicalSubjectReport[];
+    canonical_attendance: Record<string, number> | null;
+}
+
+interface CanonicalSubjectReport {
+    subject?: {
+        id?: string;
+        name?: string;
+    };
+    domain_averages?: {
+        knowledge?: number | null;
+        skill?: number | null;
+        attitude?: number | null;
+        creativity?: number | null;
+    };
 }
 
 // Interface untuk editing state
@@ -123,24 +141,34 @@ interface AccomplishmentWithMetadata extends Accomplishment {
     scheduleId: string;
 }
 
-const formatDate = (date: string) => {
-    if (!date) return "-";
-    return new Date(date).toLocaleDateString("id-ID", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-    });
+const formatDate = (value?: string | null) => {
+    if (!value) return "-";
+
+    // Preserve API date-only values exactly. Parsing `YYYY-MM-DD` through
+    // `Date` can move the calendar day in some browser timezones.
+    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/.exec(value);
+    if (dateOnly) {
+        const [, year, month, day] = dateOnly;
+        return `${day}-${month}-${year}`;
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "-";
+
+    const day = String(parsed.getDate()).padStart(2, "0");
+    const month = String(parsed.getMonth() + 1).padStart(2, "0");
+    return `${day}-${month}-${parsed.getFullYear()}`;
 };
 
-const formatDateTime = (date: string) => {
-    if (!date) return "-";
-    return new Date(date).toLocaleString("id-ID", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-    });
+const formatDateTime = (value?: string | null) => {
+    if (!value) return "-";
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return formatDate(value);
+
+    const hour = String(parsed.getHours()).padStart(2, "0");
+    const minute = String(parsed.getMinutes()).padStart(2, "0");
+    return `${formatDate(value)} ${hour}:${minute}`;
 };
 
 const getStatusBadgeColor = (status: string) => {
@@ -199,6 +227,7 @@ export default function StudentDetailPage() {
     const searchParams = useSearchParams();
     const { performanceStudentsByStudent, updatePerformanceStudent, exportPerformanceStudentPDF, canonicalPerformanceStudent } = useReportStore();
     const { academicYears, fetchAcademicYears, loading: yearsLoading } = useAcademicYearStore();
+    const { confirm, confirmationDialog } = useConfirmDialog();
     const studentId = params.student_id;
 
     const [student, setStudent] = useState<StudentData | null>(null);
@@ -242,7 +271,7 @@ export default function StudentDetailPage() {
         const q = new URLSearchParams(searchParams?.toString() || "");
         q.set("academic_year_id", selectedYear.id);
         router.replace(`/reports/students/${studentId}?${q.toString()}`);
-    }, [academicYears.length, selectedYear?.id, urlYearId, studentId, router, searchParams]);
+    }, [academicYears.length, selectedYear, urlYearId, studentId, router, searchParams]);
 
     // Selector handler — writes to the URL (does not mutate active term).
     const handleSelectYear = useCallback(
@@ -257,10 +286,9 @@ export default function StudentDetailPage() {
 
     const isHistorical = Boolean(selectedYear && !selectedYear.is_active);
     const isClosed = selectedYear?.status === "closed";
-    // Edit / PDF controls remain enabled only for the *active* selected term,
-    // matching the “active vs. historical behavior” contract in the docs.
+    // Historical semesters are read-only, but their canonical PDF remains exportable.
     const editingAllowed = Boolean(selectedYear?.is_active);
-    const pdfAllowed = editingAllowed; // legacy PDF endpoint has no semester arg → gate it too
+    const pdfAllowed = Boolean(selectedYear);
     
     // State untuk edit
     const [editingScore, setEditingScore] = useState<EditingScoreState | null>(null);
@@ -280,24 +308,24 @@ export default function StudentDetailPage() {
 
     useEffect(() => {
         async function load() {
+            let mySeq: number | null = null;
             try {
                 if (!studentId) return;
                 if (academicYears.length && !selectedYear) return; // waiting on selection resolution
-                const mySeq = ++requestSeqRef.current;
+                mySeq = ++requestSeqRef.current;
                 setLoading(true);
                 setReportError(null);
-                // Prefer the semester-aware canonical endpoint. When no year is
-                // selected yet (still loading years) we call it without the arg
-                // so the backend returns the active term — matching v1 behavior.
-                const response: any = selectedYear
+                // The active report still needs the legacy detail contract for
+                // assessment editing. Historical terms use the canonical,
+                // semester-aware and read-only contract.
+                const response: any = selectedYear && !selectedYear.is_active
                     ? await canonicalPerformanceStudent(studentId, selectedYear.id)
                     : await performanceStudentsByStudent(studentId);
 
                 if (mySeq !== requestSeqRef.current) return; // stale response — ignore
-                const data = response?.data;
-                setStudent(data ?? null);
+                setStudent(normalizeStudentReport(response?.data));
             } catch (error: any) {
-                if (requestSeqRef.current) {
+                if (mySeq === requestSeqRef.current) {
                     console.error(error);
                     setReportError(
                         error?.response?.data?.message ||
@@ -306,18 +334,25 @@ export default function StudentDetailPage() {
                     setStudent(null);
                 }
             } finally {
-                setLoading(false);
+                if (mySeq === requestSeqRef.current) {
+                    setLoading(false);
+                }
             }
         }
 
         load();
-    }, [studentId, selectedYear?.id, academicYears.length, canonicalPerformanceStudent, performanceStudentsByStudent]);
+    }, [studentId, selectedYear, academicYears.length, canonicalPerformanceStudent, performanceStudentsByStudent]);
 
     // Reset editing state saat student berubah
     useEffect(() => {
         setEditingScore(null);
         setUpdateMessage(null);
     }, [student]);
+
+    const studentAttendances = useMemo(
+        () => (Array.isArray(student?.attendances) ? student.attendances : []),
+        [student?.attendances],
+    );
 
     const attendanceStats = useMemo(() => {
         if (!student) {
@@ -330,7 +365,17 @@ export default function StudentDetailPage() {
             };
         }
 
-        const data = student.attendances || [];
+        if (student.canonical_attendance) {
+            return {
+                present: numericValue(student.canonical_attendance.present),
+                absent: numericValue(student.canonical_attendance.absent),
+                sick: numericValue(student.canonical_attendance.sick),
+                permission: numericValue(student.canonical_attendance.permission),
+                late: numericValue(student.canonical_attendance.late),
+            };
+        }
+
+        const data = studentAttendances;
 
         return {
             present: data.filter((x: Attendance) => x.status === "present").length,
@@ -339,7 +384,7 @@ export default function StudentDetailPage() {
             permission: data.filter((x: Attendance) => x.status === "permission").length,
             late: data.filter((x: Attendance) => x.status === "late").length,
         };
-    }, [student]);
+    }, [student, studentAttendances]);
 
     // Get all accomplishments with metadata
     const allAccomplishments = useMemo<AccomplishmentWithMetadata[]>(() => {
@@ -347,7 +392,7 @@ export default function StudentDetailPage() {
 
         const accomplishments: AccomplishmentWithMetadata[] = [];
 
-        student.attendances.forEach((att: Attendance) => {
+        studentAttendances.forEach((att: Attendance) => {
             if (!att.schedule?.subject?.accomplishments) return;
             
             att.schedule.subject.accomplishments.forEach((item: Accomplishment) => {
@@ -361,8 +406,34 @@ export default function StudentDetailPage() {
             });
         });
 
+        // Canonical historical reports provide aggregate domain averages per
+        // subject instead of mutable accomplishment rows. Represent them as
+        // read-only cards; edit controls are already disabled for old terms.
+        (student.canonical_subjects ?? []).forEach((subjectReport, subjectIndex) => {
+            const subjectId = subjectReport.subject?.id ?? String(subjectIndex);
+            const subjectName = subjectReport.subject?.name ?? "Mata Pelajaran";
+            const reportDate = selectedYear?.end_periode ?? selectedYear?.start_periode ?? "";
+
+            (["skill", "knowledge"] as const).forEach((type) => {
+                const score = subjectReport.domain_averages?.[type];
+                if (typeof score !== "number" || !Number.isFinite(score)) return;
+
+                accomplishments.push({
+                    id: `canonical-${subjectId}-${type}`,
+                    name: type === "skill" ? "Rata-rata Tugas" : "Rata-rata Pemahaman",
+                    type,
+                    score,
+                    is_capable: score >= 60,
+                    subject: subjectName,
+                    date: reportDate,
+                    attendanceId: `canonical-${subjectId}`,
+                    scheduleId: `canonical-${subjectId}`,
+                });
+            });
+        });
+
         return accomplishments;
-    }, [student]);
+    }, [student, studentAttendances, selectedYear?.end_periode, selectedYear?.start_periode]);
 
     const skills = allAccomplishments.filter((item: any) => item.type === "skill");
     const knowledge = allAccomplishments.filter((item: any) => item.type === "knowledge");
@@ -405,7 +476,7 @@ export default function StudentDetailPage() {
 
             if (response?.success) {
                 const refreshedResponse: any = await performanceStudentsByStudent(studentId!);
-                setStudent(refreshedResponse?.data ?? null);
+                setStudent(normalizeStudentReport(refreshedResponse?.data));
             }
 
             return { success: true };
@@ -418,14 +489,18 @@ export default function StudentDetailPage() {
     }, [studentId, updatePerformanceStudent, performanceStudentsByStudent]);
 
     // Handler untuk edit click
-    const handleEditClick = useCallback((accomplishment: AccomplishmentWithMetadata) => {
+    const handleEditClick = useCallback(async (accomplishment: AccomplishmentWithMetadata) => {
         if (isUpdating) return;
         if (!editingAllowed) return; // read-only for historical semesters
 
         if (editingScore) {
-            const confirmSwitch = window.confirm(
-                'Anda sedang mengedit nilai lain. Beralih ke accomplishment ini akan membatalkan perubahan yang belum disimpan. Lanjutkan?'
-            );
+            const confirmSwitch = await confirm({
+                title: 'Beralih penilaian?',
+                description: 'Perubahan yang belum disimpan akan dibatalkan jika Anda beralih ke penilaian lain.',
+                confirmLabel: 'Ya, beralih',
+                tone: 'warning',
+                testId: 'student-score-switch-confirm',
+            });
             if (!confirmSwitch) return;
             
             setEditingScore(null);
@@ -449,7 +524,7 @@ export default function StudentDetailPage() {
         setTempScore(accomplishment.score);
         setTempIsCapable(accomplishment.is_capable || false);
         setUpdateMessage(null);
-    }, [editingScore, isUpdating, editingAllowed]);
+    }, [editingScore, isUpdating, editingAllowed, confirm]);
 
     // Handler untuk cancel edit
     const handleCancelEdit = useCallback(() => {
@@ -470,12 +545,12 @@ export default function StudentDetailPage() {
         // Validasi untuk skill
         if (editingScore.type === 'skill') {
             if (!Number.isFinite(tempScore)) {
-                setUpdateMessage({ type: 'error', text: 'Nilai skill tidak valid' });
+                setUpdateMessage({ type: 'error', text: 'Nilai tugas tidak valid' });
                 return;
             }
 
             if (tempScore < 0 || tempScore > 100) {
-                setUpdateMessage({ type: 'error', text: 'Nilai skill harus antara 0–100' });
+                setUpdateMessage({ type: 'error', text: 'Nilai tugas harus antara 0–100' });
                 return;
             }
 
@@ -484,9 +559,13 @@ export default function StudentDetailPage() {
                 return;
             }
 
-            const confirmed = window.confirm(
-                `Ubah nilai skill dari ${editingScore.currentScore} menjadi ${tempScore}?`
-            );
+            const confirmed = await confirm({
+                title: 'Konfirmasi nilai tugas',
+                description: `Nilai tugas akan diubah dari ${editingScore.currentScore} menjadi ${tempScore}.`,
+                confirmLabel: 'Simpan perubahan',
+                tone: 'primary',
+                testId: 'student-skill-score-confirm',
+            });
             if (!confirmed) return;
         }
 
@@ -497,9 +576,13 @@ export default function StudentDetailPage() {
                 return;
             }
 
-            const confirmed = window.confirm(
-                `Ubah status pengetahuan dari ${editingScore.isCapable ? 'Capable' : 'Not Capable'} menjadi ${tempIsCapable ? 'Capable' : 'Not Capable'}?`
-            );
+            const confirmed = await confirm({
+                title: 'Konfirmasi pemahaman',
+                description: `Status pemahaman akan diubah dari ${editingScore.isCapable ? 'Mampu' : 'Tidak Mampu'} menjadi ${tempIsCapable ? 'Mampu' : 'Tidak Mampu'}.`,
+                confirmLabel: 'Simpan perubahan',
+                tone: 'primary',
+                testId: 'student-knowledge-score-confirm',
+            });
             if (!confirmed) return;
         }
 
@@ -518,8 +601,8 @@ export default function StudentDetailPage() {
             setUpdateMessage({
                 type: 'success',
                 text: editingScore.type === 'skill'
-                    ? `Nilai skill berhasil diubah dari ${editingScore.currentScore} ke ${tempScore}`
-                    : `Status pengetahuan berhasil diubah menjadi ${tempIsCapable ? 'Capable ✓' : 'Not Capable ✗'}`
+                    ? `Nilai tugas berhasil diubah dari ${editingScore.currentScore} ke ${tempScore}`
+                    : `Status pemahaman berhasil diubah menjadi ${tempIsCapable ? 'Mampu ✓' : 'Tidak Mampu ✗'}`
             });
 
             setEditingScore(null);
@@ -539,7 +622,7 @@ export default function StudentDetailPage() {
         } finally {
             setIsUpdating(false);
         }
-    }, [editingScore, tempScore, tempIsCapable, handleUpdateScore, isUpdating, editingAllowed]);
+    }, [editingScore, tempScore, tempIsCapable, handleUpdateScore, isUpdating, editingAllowed, confirm]);
 
     // Cek apakah accomplishment sedang diedit
     const isEditing = useCallback((accomplishmentId: string, attendanceId: string) => {
@@ -550,18 +633,18 @@ export default function StudentDetailPage() {
     // Handler untuk download PDF
     const handleDownloadPDF = useCallback(async () => {
         if (!studentId || downloading) return;
-        if (!pdfAllowed) return; // legacy PDF endpoint has no semester arg — never export while historical
+        if (!pdfAllowed || !selectedYear) return;
         
         setDownloading(true);
         try {
-            await exportPerformanceStudentPDF(studentId);
+            await exportPerformanceStudentPDF(studentId, selectedYear.id);
         } catch (error: any) {
             console.error('Error downloading PDF:', error);
             alert(error.response?.data?.message || 'Gagal mengunduh PDF. Silakan coba lagi.');
         } finally {
             setDownloading(false);
         }
-    }, [studentId, downloading, pdfAllowed, exportPerformanceStudentPDF]);
+    }, [studentId, downloading, pdfAllowed, selectedYear, exportPerformanceStudentPDF]);
 
     if (loading) {
         return (
@@ -579,7 +662,7 @@ export default function StudentDetailPage() {
             <ProtectedRoute allowedRoles={["admin", "teacher"]}>
                 <div className="min-h-screen bg-[var(--sipta-background)] pb-8">
                     <HeaderComponent />
-                    <main className="mx-auto max-w-5xl px-5 py-6 space-y-4">
+                    <main className="mx-auto max-w-xl space-y-4 px-4 py-5">
                         {/* Selector remains available so users can switch semesters */}
                         <SemesterSelector
                             academicYears={academicYears}
@@ -650,7 +733,7 @@ export default function StudentDetailPage() {
                                 disabled={downloading || !pdfAllowed}
                                 title={
                                     !pdfAllowed
-                                        ? "Ekspor PDF hanya tersedia untuk semester aktif"
+                                        ? "Pilih semester sebelum mengekspor PDF"
                                         : undefined
                                 }
                                 className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-full shadow hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
@@ -684,7 +767,7 @@ export default function StudentDetailPage() {
                                     icon={<LockClosedIcon className="h-5 w-5" />}
                                     testId="semester-archive-banner"
                                 >
-                                    Kontrol edit dan ekspor PDF dinonaktifkan untuk semester ini. Semester aktif operasional tidak berubah.
+                                    Kontrol edit dinonaktifkan untuk semester arsip. Laporan tetap dapat dilihat dan diekspor tanpa mengubah semester aktif operasional.
                                 </Alert>
                             </div>
                         )}
@@ -771,15 +854,15 @@ export default function StudentDetailPage() {
                                     color="green"
                                 />
                                 <StatCard
-                                    title="Skill"
+                                    title="Tugas"
                                     value={student.summary.average_scores.skill.toFixed(1)}
-                                    subtitle={`${capableSkills.length} capable`}
+                                    subtitle={`${capableSkills.length} mampu`}
                                     color="purple"
                                 />
                                 <StatCard
-                                    title="Knowledge"
-                                    value={student.summary.average_scores.creativity1.toFixed(1)}
-                                    subtitle={`${capableKnowledge.length} capable`}
+                                    title="Pemahaman"
+                                    value={student.summary.average_scores.knowledge.toFixed(1)}
+                                    subtitle={`${capableKnowledge.length} mampu`}
                                     color="orange"
                                 />
                             </div>
@@ -792,21 +875,21 @@ export default function StudentDetailPage() {
                                 <div className="p-4 bg-orange-50 rounded-xl">
                                     <div className="flex items-center gap-2">
                                         <FireIcon className="h-6 text-orange-500" />
-                                        <p className="text-sm text-gray-600">Skill</p>
+                                        <p className="text-sm text-gray-600">Tugas</p>
                                     </div>
                                     <b className="text-xl">{skills.length}</b>
                                     <p className="text-xs text-gray-500">
-                                        {capableSkills.length} capable
+                                        {capableSkills.length} mampu
                                     </p>
                                 </div>
                                 <div className="p-4 bg-blue-50 rounded-xl">
                                     <div className="flex items-center gap-2">
                                         <LightBulbIcon className="h-6 text-blue-500" />
-                                        <p className="text-sm text-gray-600">Knowledge</p>
+                                        <p className="text-sm text-gray-600">Pemahaman</p>
                                     </div>
                                     <b className="text-xl">{knowledge.length}</b>
                                     <p className="text-xs text-gray-500">
-                                        {capableKnowledge.length} capable
+                                        {capableKnowledge.length} mampu
                                     </p>
                                 </div>
                             </div>
@@ -849,7 +932,7 @@ export default function StudentDetailPage() {
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="font-bold text-lg flex items-center gap-2">
                                     <FireIcon className="w-5 h-5 text-orange-500" />
-                                    Skill Assessment
+                                    Penilaian Tugas
                                 </h2>
                                 {/* <span className="text-xs text-gray-500">
                                     Klik icon pensil untuk edit
@@ -978,7 +1061,7 @@ export default function StudentDetailPage() {
                             ) : (
                                 <div className="text-center py-8">
                                     <FireIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                                    <p className="text-gray-500">Tidak ada data skill assessment</p>
+                                    <p className="text-gray-500">Tidak ada data penilaian tugas</p>
                                 </div>
                             )}
                             </div>
@@ -989,7 +1072,7 @@ export default function StudentDetailPage() {
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="font-bold text-lg flex items-center gap-2">
                                     <LightBulbIcon className="w-5 h-5 text-blue-500" />
-                                    Knowledge Assessment
+                                    Penilaian Pemahaman
                                 </h2>
                                 {/* <span className="text-xs text-gray-500">
                                     Klik icon pensil untuk edit
@@ -1136,7 +1219,7 @@ export default function StudentDetailPage() {
                             ) : (
                                 <div className="text-center py-8">
                                     <LightBulbIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                                    <p className="text-gray-500">Tidak ada data knowledge assessment</p>
+                                    <p className="text-gray-500">Tidak ada data penilaian pemahaman</p>
                                 </div>
                             )}
                             </div>
@@ -1146,12 +1229,14 @@ export default function StudentDetailPage() {
                         <section className="mt-5 bg-white rounded-3xl p-5 shadow">
                             <h2 className="font-bold text-lg">Riwayat Kehadiran</h2>
                             <div className="mt-4 space-y-3 max-h-96 overflow-y-auto">
-                                {student.attendances.length === 0 ? (
+                                {studentAttendances.length === 0 ? (
                                     <p className="text-gray-500 text-center py-4">
-                                        Belum ada data kehadiran
+                                        {student.report_mode === "canonical"
+                                            ? "Riwayat per sesi tidak tersedia pada laporan arsip; ringkasan kehadiran ditampilkan di atas."
+                                            : "Belum ada data kehadiran"}
                                     </p>
                                 ) : (
-                                    student.attendances.map((att: Attendance) => (
+                                    studentAttendances.map((att: Attendance) => (
                                         <div
                                             key={att.id}
                                             className="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition"
@@ -1344,6 +1429,7 @@ export default function StudentDetailPage() {
                     </div>
                 </main>
             </div>
+            {confirmationDialog}
         </ProtectedRoute>
     );
 }
@@ -1403,3 +1489,116 @@ function AttendanceCard({
         </div>
     );
 }
+
+const numericValue = (value: unknown): number => {
+    const parsed = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const averageDomain = (
+    subjects: CanonicalSubjectReport[],
+    domain: keyof NonNullable<CanonicalSubjectReport["domain_averages"]>,
+): number => {
+    const scores = subjects
+        .map((subject) => subject.domain_averages?.[domain])
+        .filter((score): score is number => typeof score === "number" && Number.isFinite(score));
+
+    if (scores.length === 0) return 0;
+    return scores.reduce((total, score) => total + score, 0) / scores.length;
+};
+
+/**
+ * The active-term legacy endpoint and the semester-aware canonical endpoint
+ * intentionally return different shapes. Keep that contract difference at
+ * this boundary so rendering code always receives safe arrays and numbers.
+ */
+const normalizeStudentReport = (payload: any): StudentData | null => {
+    if (!payload?.student) return null;
+
+    const baseStudent = {
+        id: payload.student.id ?? "",
+        fullname: payload.student.fullname ?? payload.student.full_name ?? "-",
+        gender: payload.student.gender ?? "",
+        birth_date: payload.student.birth_date ?? "",
+        phone: payload.student.phone ?? "",
+        address: payload.student.address ?? "",
+        photo: payload.student.photo ?? "",
+        status: payload.student.status ?? "",
+    };
+    const classroom = {
+        id: payload.classroom?.id ?? "",
+        name: payload.classroom?.name ?? "Kelas tidak tersedia",
+        teacher: {
+            id: payload.classroom?.teacher?.id ?? "",
+            full_name: payload.classroom?.teacher?.full_name ?? null,
+        },
+    };
+    const academicYear = {
+        id: payload.academic_year?.id ?? "",
+        name: payload.academic_year?.name ?? "-",
+        periode: payload.academic_year?.periode ?? "",
+    };
+
+    if (Array.isArray(payload.attendances) || payload.summary) {
+        const averageScores = payload.summary?.average_scores ?? {};
+        return {
+            ...payload,
+            report_mode: "legacy",
+            student: baseStudent,
+            classroom,
+            academic_year: academicYear,
+            summary: {
+                total_attendance: numericValue(payload.summary?.total_attendance),
+                present_count: numericValue(payload.summary?.present_count),
+                attendance_percentage: numericValue(payload.summary?.attendance_percentage),
+                final_score: numericValue(payload.summary?.final_score),
+                average_scores: {
+                    creativity1: numericValue(averageScores.creativity1),
+                    creativity2: numericValue(averageScores.creativity2),
+                    creativity: numericValue(averageScores.creativity),
+                    attitude: numericValue(averageScores.attitude),
+                    skill: numericValue(averageScores.skill),
+                    knowledge: numericValue(averageScores.knowledge ?? averageScores.creativity1),
+                },
+            },
+            attendances: Array.isArray(payload.attendances) ? payload.attendances : [],
+            canonical_subjects: [],
+            canonical_attendance: null,
+        };
+    }
+
+    const subjects: CanonicalSubjectReport[] = Array.isArray(payload.subjects)
+        ? payload.subjects
+        : [];
+    const byStatus = payload.attendance?.by_status ?? {};
+
+    return {
+        report_mode: "canonical",
+        student: baseStudent,
+        classroom,
+        academic_year: academicYear,
+        summary: {
+            total_attendance: numericValue(payload.attendance?.expected_sessions),
+            present_count: numericValue(byStatus.present),
+            attendance_percentage: numericValue(payload.attendance?.percentage),
+            final_score: numericValue(payload.final_score ?? payload.provisional_score),
+            average_scores: {
+                creativity1: averageDomain(subjects, "creativity"),
+                creativity2: averageDomain(subjects, "creativity"),
+                creativity: averageDomain(subjects, "creativity"),
+                attitude: averageDomain(subjects, "attitude"),
+                skill: averageDomain(subjects, "skill"),
+                knowledge: averageDomain(subjects, "knowledge"),
+            },
+        },
+        attendances: [],
+        canonical_subjects: subjects,
+        canonical_attendance: {
+            present: numericValue(byStatus.present),
+            absent: numericValue(byStatus.absent),
+            sick: numericValue(byStatus.sick),
+            permission: numericValue(byStatus.permission),
+            late: numericValue(byStatus.late),
+        },
+    };
+};

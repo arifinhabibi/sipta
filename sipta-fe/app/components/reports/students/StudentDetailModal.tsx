@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Accomplishment, AccomplishmentType, AttendanceStatus, Student, StudentTabData } from "./StudentTab";
 import { AcademicCapIcon, ArrowPathIcon, CheckCircleIcon, DocumentArrowDownIcon, ExclamationTriangleIcon, InformationCircleIcon, PencilIcon, UserIcon, XCircleIcon, XMarkIcon, FireIcon, LightBulbIcon } from "@heroicons/react/24/outline";
+import { formatDateDDMMYYYY } from "@/src/utils/date";
+import { useConfirmDialog } from "@/app/components/ui";
 
 interface StudentDetailModalProps {
   isOpen: boolean;
@@ -60,6 +62,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
   const [updateMessage, setUpdateMessage] = useState<UpdateMessage | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const { confirm, confirmationDialog } = useConfirmDialog();
   
   // Ref untuk menyimpan mapping accomplishment id ke data
   const accomplishmentsRef = useRef<Map<string, AccomplishmentWithMetadata>>(new Map());
@@ -179,9 +182,15 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
   }, [isOpen, isUpdating]);
 
   // Callbacks
-  const handleClose = useCallback(() => {
+  const handleClose = useCallback(async () => {
     if (editingScore && !isUpdating) {
-      const confirmClose = window.confirm('Perubahan yang belum disimpan akan hilang. Tutup modal?');
+      const confirmClose = await confirm({
+        title: 'Tutup detail siswa?',
+        description: 'Perubahan penilaian yang belum disimpan akan dibatalkan.',
+        confirmLabel: 'Ya, tutup',
+        tone: 'warning',
+        testId: 'student-detail-close-confirm',
+      });
       if (!confirmClose) return;
     }
     setIsClosing(true);
@@ -189,7 +198,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
       onClose();
       setIsClosing(false);
     }, 200);
-  }, [editingScore, isUpdating, onClose]);
+  }, [editingScore, isUpdating, onClose, confirm]);
 
   const handleScoreUpdate = useCallback(async () => {
     if (!editingScore || isUpdating) return;
@@ -199,12 +208,12 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
     // Validasi untuk skill
     if (editingScore.type === 'skill') {
       if (!Number.isFinite(tempScore)) {
-        setUpdateMessage({ type: 'error', text: 'Nilai skill tidak valid' });
+        setUpdateMessage({ type: 'error', text: 'Nilai tugas tidak valid' });
         return;
       }
 
       if (tempScore < 0 || tempScore > 100) {
-        setUpdateMessage({ type: 'error', text: 'Nilai skill harus antara 0–100' });
+        setUpdateMessage({ type: 'error', text: 'Nilai tugas harus antara 0–100' });
         return;
       }
 
@@ -213,10 +222,13 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
         return;
       }
 
-      // Hanya konfirmasi biasa, tidak ada pembatasan
-      const confirmed = window.confirm(
-        `Ubah nilai skill dari ${editingScore.currentScore} menjadi ${tempScore}?`
-      );
+      const confirmed = await confirm({
+        title: 'Konfirmasi nilai tugas',
+        description: `Nilai tugas akan diubah dari ${editingScore.currentScore} menjadi ${tempScore}.`,
+        confirmLabel: 'Simpan perubahan',
+        tone: 'primary',
+        testId: 'student-modal-skill-score-confirm',
+      });
       if (!confirmed) return;
     }
 
@@ -227,10 +239,13 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
         return;
       }
 
-      // Hanya konfirmasi biasa, tidak ada pembatasan
-      const confirmed = window.confirm(
-        `Ubah status pengetahuan dari ${editingScore.isCapable ? 'Capable' : 'Not Capable'} menjadi ${tempIsCapable ? 'Capable' : 'Not Capable'}?`
-      );
+      const confirmed = await confirm({
+        title: 'Konfirmasi pemahaman',
+        description: `Status pemahaman akan diubah dari ${editingScore.isCapable ? 'Mampu' : 'Tidak Mampu'} menjadi ${tempIsCapable ? 'Mampu' : 'Tidak Mampu'}.`,
+        confirmLabel: 'Simpan perubahan',
+        tone: 'primary',
+        testId: 'student-modal-knowledge-score-confirm',
+      });
       if (!confirmed) return;
     }
 
@@ -251,8 +266,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
         type: 'success',
         text:
           editingScore.type === 'skill'
-            ? `Nilai skill berhasil diubah dari ${editingScore.currentScore} ke ${tempScore}`
-            : `Status pengetahuan berhasil diubah menjadi ${tempIsCapable ? 'Capable ✓' : 'Not Capable ✗'}`
+            ? `Nilai tugas berhasil diubah dari ${editingScore.currentScore} ke ${tempScore}`
+            : `Status pemahaman berhasil diubah menjadi ${tempIsCapable ? 'Mampu ✓' : 'Tidak Mampu ✗'}`
       });
 
       // Reset editing state
@@ -274,10 +289,10 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
     } finally {
       setIsUpdating(false);
     }
-  }, [editingScore, tempScore, tempIsCapable, onUpdateScore, isUpdating]);
+  }, [editingScore, tempScore, tempIsCapable, onUpdateScore, isUpdating, confirm]);
 
   // handleEditClick - SEMUA BISA DIEDIT TANPA SYARAT
-  const handleEditClick = useCallback((accomplishment: AccomplishmentWithMetadata) => {
+  const handleEditClick = useCallback(async (accomplishment: AccomplishmentWithMetadata) => {
     // Cegah jika sedang updating
     if (isUpdating) {
       // console.log('Currently updating, ignoring edit click');
@@ -304,9 +319,13 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
 
     // Jika sedang mengedit accomplishment lain, tanyakan konfirmasi
     if (editingScore) {
-      const confirmSwitch = window.confirm(
-        'Anda sedang mengedit nilai lain. Beralih ke accomplishment ini akan membatalkan perubahan yang belum disimpan. Lanjutkan?'
-      );
+      const confirmSwitch = await confirm({
+        title: 'Beralih penilaian?',
+        description: 'Perubahan yang belum disimpan akan dibatalkan jika Anda beralih ke penilaian lain.',
+        confirmLabel: 'Ya, beralih',
+        tone: 'warning',
+        testId: 'student-modal-score-switch-confirm',
+      });
       if (!confirmSwitch) return;
       
       // Reset editing state
@@ -350,7 +369,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
         }, 1000);
       }
     }, 100);
-  }, [editingScore, isUpdating]);
+  }, [editingScore, isUpdating, confirm]);
 
   // Fungsi untuk menangani cancel editing
   const handleCancelEdit = useCallback(() => {
@@ -363,34 +382,11 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
   }, [isUpdating]);
 
   const formatDate = useCallback((dateString: string): string => {
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'Tanggal tidak valid';
-      
-      return new Intl.DateTimeFormat('id-ID', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric'
-      }).format(date);
-    } catch {
-      return 'Tanggal tidak valid';
-    }
+    return formatDateDDMMYYYY(dateString, 'Tanggal tidak valid');
   }, []);
 
   const formatDateFull = useCallback((dateString: string): string => {
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'Tanggal tidak valid';
-      
-      return new Intl.DateTimeFormat('id-ID', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      }).format(date);
-    } catch {
-      return 'Tanggal tidak valid';
-    }
+    return formatDateDDMMYYYY(dateString, 'Tanggal tidak valid');
   }, []);
 
   const renderAttendanceStatus = useCallback((status: AttendanceStatus) => {
@@ -508,7 +504,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                 <div className="text-2xl font-bold text-gray-900">
                   {(student.summary?.average_scores?.skill || 0).toFixed(1)}
                 </div>
-                <div className="text-xs text-gray-600 mt-1">Skill</div>
+                <div className="text-xs text-gray-600 mt-1">Tugas</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-gray-900">
@@ -532,7 +528,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
               >
                 <div className="flex items-center justify-center gap-1">
                   <FireIcon className="w-4 h-4" />
-                  <span>Skill</span>
+                  <span>Tugas</span>
                   <span className={`px-1.5 py-0.5 text-xs rounded-full ${
                     activeTab === 'skills' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-600'
                   }`}>
@@ -552,7 +548,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
               >
                 <div className="flex items-center justify-center gap-1">
                   <LightBulbIcon className="w-4 h-4" />
-                  <span>Pengetahuan</span>
+                  <span>Pemahaman</span>
                   <span className={`px-1.5 py-0.5 text-xs rounded-full ${
                     activeTab === 'knowledge' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
                   }`}>
@@ -592,10 +588,10 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                         <FireIcon className="w-5 h-5 text-orange-500" />
-                        Skill Assessment
+                        Penilaian Tugas
                       </h3>
                       <p className="text-sm text-gray-600 mt-1">
-                        Semua skill dapat diedit (tanpa batasan nilai)
+                        Semua tugas dapat diedit (tanpa batasan nilai)
                       </p>
                     </div>
                   </div>
@@ -732,7 +728,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                   ) : (
                     <div className="text-center py-8">
                       <FireIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-500">Tidak ada data skill assessment</p>
+                      <p className="text-gray-500">Tidak ada data penilaian tugas</p>
                     </div>
                   )}
                 </div>
@@ -744,10 +740,10 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                         <LightBulbIcon className="w-5 h-5 text-blue-500" />
-                        Knowledge Assessment
+                        Penilaian Pemahaman
                       </h3>
                       <p className="text-sm text-gray-600 mt-1">
-                        Semua pengetahuan dapat diedit (tanpa batasan status capable)
+                        Semua pemahaman dapat diedit (tanpa batasan status mampu)
                       </p>
                     </div>
                   </div>
@@ -799,7 +795,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                                 {isCurrentlyEditing ? (
                                   <div className="flex flex-col gap-2 w-full">
                                     <div className="flex flex-col gap-1 mt-2 w-full">
-                                      <label className="text-xs font-medium text-gray-700">Status Capable:</label>
+                                      <label className="text-xs font-medium text-gray-700">Status Pemahaman:</label>
                                       <div className="flex gap-4">
                                         <label className="flex items-center gap-1 text-sm cursor-pointer">
                                           <input
@@ -813,7 +809,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                                           />
                                           <span className="text-green-700 flex items-center gap-1">
                                             <CheckCircleIcon className="w-3 h-3" />
-                                            Capable
+                                            Mampu
                                           </span>
                                         </label>
                                         <label className="flex items-center gap-1 text-sm cursor-pointer">
@@ -828,7 +824,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                                           />
                                           <span className="text-red-700 flex items-center gap-1">
                                             <XCircleIcon className="w-3 h-3" />
-                                            Not Capable
+                                            Tidak Mampu
                                           </span>
                                         </label>
                                       </div>
@@ -869,12 +865,12 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                                         {accomplishment.is_capable ? (
                                           <>
                                             <CheckCircleIcon className="w-3 h-3" />
-                                            Capable
+                                            Mampu
                                           </>
                                         ) : (
                                           <>
                                             <XCircleIcon className="w-3 h-3" />
-                                            Not Capable
+                                            Tidak Mampu
                                           </>
                                         )}
                                       </div>
@@ -903,7 +899,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                   ) : (
                     <div className="text-center py-8">
                       <LightBulbIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-500">Tidak ada data knowledge assessment</p>
+                      <p className="text-gray-500">Tidak ada data penilaian pemahaman</p>
                     </div>
                   )}
                 </div>
@@ -1000,6 +996,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
           </div> */}
         </div>
       </div>
+      {confirmationDialog}
     </div>
   );
 };
